@@ -235,7 +235,6 @@
     .stats{padding:14px 12px 4px;gap:10px}
     .stat{padding:11px 13px}
     .stat .v{font-size:22px}
-    .col{width:250px;min-width:250px}
     .modal{border-radius:14px}
     .modal-head{padding:14px 16px}
     .modal-body{padding:16px}
@@ -248,6 +247,10 @@
     .toolbar{gap:8px}
     .search{min-width:100%}
     select.filter{flex:1;min-width:120px}
+    /* board becomes single-column scroll-down */
+    .board{flex-direction:column;overflow-x:visible}
+    .col{width:100%;min-width:100%;max-height:none;margin-bottom:12px}
+    .col-body{max-height:none;overflow-y:visible}
   }
   @media(max-width:480px){
     .brand .name small{display:none}
