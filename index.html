@@ -50,7 +50,7 @@
 
   /* Stats */
   .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;padding:20px 22px 4px}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .stat{cursor:pointer;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
   .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700}
   .stat .v{font-size:26px;font-weight:800;margin-top:4px}
   .stat .v small{font-size:13px;color:var(--muted);font-weight:600}
@@ -821,10 +821,10 @@ function renderStats(){
   const t=todayStr();
   const due=leads.filter(l=>l.followUp&&l.followUp<=t&&!['won','lost'].includes(l.stage)).length;
   document.getElementById('stats').innerHTML=`
-    <div class="stat accent"><div class="k">New Leads</div><div class="v">${nNew}</div></div>
-    <div class="stat"><div class="k">Follow-ups Due</div><div class="v" style="${due?'color:var(--red)':''}">${due}</div></div>
-    <div class="stat"><div class="k">In Progress</div><div class="v">${active}</div></div>
-    <div class="stat"><div class="k">Pipeline Value</div><div class="v">${money(pipeValue)||'$0'}</div></div>
+    <div class="stat accent" onclick="showPage('pipeline')"><div class="k">New Leads</div><div class="v">${nNew}</div></div>
+    <div class="stat" onclick="showPage('pipeline')"><div class="k">Follow-ups Due</div><div class="v" style="${due?'color:var(--red)':''}">${due}</div></div>
+    <div class="stat" onclick="showPage('clients')"><div class="k">In Progress</div><div class="v">${active}</div></div>
+    <div class="stat" onclick="showPage('clients')"><div class="k">Pipeline Value</div><div class="v">${money(pipeValue)||'$0'}</div></div>
     <div class="stat"><div class="k">Won (revenue)</div><div class="v" style="color:var(--green)">${money(revenue)||'$0'}</div></div>
     <div class="stat"><div class="k">Win Rate</div><div class="v">${conv}<small>%</small></div></div>`;
 }
