@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapid Oven Cleaning — CRM</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --orange:#F26A21;
+    --orange-dark:#d9550f;
+    --ink:#161616;
+    --ink-2:#222;
+    --panel:#ffffff;
+    --bg:#f2f3f5;
+    --line:#e2e4e8;
+    --muted:#6b7280;
+    --green:#16a34a;
+    --red:#dc2626;
+    --amber:#d97706;
+    --blue:#2563eb;
+    --purple:#7c3aed;
+    --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.06);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit}
+
+  /* Header */
+  header{background:var(--ink);color:#fff;padding:0 22px;display:flex;align-items:center;gap:22px;height:60px;position:sticky;top:0;z-index:50}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.5px;flex-shrink:0}
+  .brand .mark{width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+  .brand .mark svg{width:30px;height:30px}
+  .brand .name{font-size:16px;line-height:1}
+  .brand .name small{display:block;font-size:9px;letter-spacing:3px;color:var(--orange);font-weight:700;margin-top:2px}
+  nav{display:flex;gap:4px;margin-left:6px;overflow-x:auto;scrollbar-width:none;min-width:0;flex-shrink:1}
+  nav::-webkit-scrollbar{display:none}
+  nav button{background:transparent;border:none;color:#c9ccd2;font-size:14px;font-weight:600;padding:9px 16px;border-radius:8px}
+  nav button.active{background:rgba(255,255,255,.10);color:#fff}
+  nav button:hover{color:#fff}
+  .spacer{flex:1}
+  .hbtn{background:var(--orange);color:#fff;border:none;font-weight:700;font-size:14px;padding:10px 16px;border-radius:9px;display:flex;align-items:center;gap:7px;white-space:nowrap;flex-shrink:0}
+  .hbtn:hover{background:var(--orange-dark)}
+  .hbtn.ghost{background:rgba(255,255,255,.08);color:#fff}
+  .hbtn.ghost:hover{background:rgba(255,255,255,.16)}
+
+  /* Stats */
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;padding:20px 22px 4px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700}
+  .stat .v{font-size:26px;font-weight:800;margin-top:4px}
+  .stat .v small{font-size:13px;color:var(--muted);font-weight:600}
+  .stat.accent{background:linear-gradient(135deg,var(--orange),#ff8a4c);border-color:transparent;color:#fff}
+  .stat.accent .k{color:rgba(255,255,255,.85)}
+
+  /* Board */
+  .wrap{padding:18px 22px 40px}
+  .board{display:flex;gap:14px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+  .col{background:#ebedf0;border-radius:14px;width:280px;min-width:280px;flex-shrink:0;display:flex;flex-direction:column;max-height:calc(100vh - 220px)}
+  .col-head{padding:13px 14px 10px;display:flex;align-items:center;gap:8px;position:sticky;top:0}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .col-head .t{font-weight:800;font-size:13px;letter-spacing:.3px}
+  .col-head .c{margin-left:auto;background:#fff;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:700;padding:1px 9px;border-radius:20px}
+  .col-body{padding:4px 10px 10px;overflow-y:auto;flex:1;min-height:60px}
+
+  /* Card */
+  .card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:pointer;border-left:3px solid var(--line);transition:box-shadow .12s}
+  .card:hover{box-shadow:0 3px 12px rgba(0,0,0,.10)}
+  .card .cn{font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .card .cn-r{display:flex;align-items:center;gap:6px;flex-shrink:0}
+  .stagesel{border:1px solid var(--line);border-radius:8px;padding:4px 5px;font-size:11px;font-weight:700;background:#fff;color:var(--ink);cursor:pointer;max-width:112px}
+  .stagesel:hover,.stagesel:focus{border-color:var(--orange)}
+  .card .val{color:var(--green);font-weight:800;font-size:13px;white-space:nowrap}
+  .card .meta{font-size:12px;color:var(--muted);margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 10px}
+  .card .meta span{display:inline-flex;align-items:center;gap:4px}
+  .tel{color:inherit;text-decoration:none;border-bottom:1px dotted #b9bec7}
+  .tel:hover{color:var(--orange);border-bottom-color:var(--orange)}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.3px}
+  .chip.svc{background:#fff2ea;color:var(--orange-dark);border:1px solid #ffd8c2}
+  .chip.src{background:#eef2ff;color:#4338ca;border:1px solid #dde3ff}
+  .chip.due{background:#f4f5f7;color:#5b6472;border:1px solid var(--line)}
+  .chip.due.today{background:#fef3c7;color:#92400e;border-color:#fde68a}
+  .chip.due.over{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+  .chip.job{background:#e8f7ee;color:#15803d;border:1px solid #bbe7cc}
+  .card .age{font-size:11px;color:#9aa0aa;margin-top:8px}
+
+  /* Clients table */
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .search{flex:1;min-width:200px;position:relative}
+  .search input{width:100%;padding:11px 12px 11px 36px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff}
+  .search svg{position:absolute;left:11px;top:11px;color:var(--muted)}
+  select.filter{padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff;font-weight:600}
+  .tablewrap{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;padding:12px 14px;background:#fafbfc;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;cursor:pointer;white-space:nowrap}
+  th:hover{color:var(--ink)}
+  td{padding:12px 14px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fdf7f3}
+  tbody tr{cursor:pointer}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+  .name-cell{font-weight:700}
+  .name-cell small{display:block;font-weight:500;color:var(--muted);font-size:12px;margin-top:1px}
+  .rowbtn{background:none;border:1px solid var(--line);border-radius:7px;padding:5px 9px;font-size:12px;font-weight:600;color:var(--muted)}
+  .rowbtn:hover{border-color:var(--orange);color:var(--orange)}
+  .empty{padding:50px;text-align:center;color:var(--muted)}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .overlay.open{display:flex}
+  .modal{background:#fff;border-radius:16px;width:520px;max-width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;border-radius:16px 16px 0 0}
+  .modal-head h3{font-size:17px;font-weight:800}
+  .x{background:none;border:none;font-size:22px;color:var(--muted);line-height:1}
+  .modal-body{padding:20px 22px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{margin-bottom:14px}
+  .field.full{grid-column:1/-1}
+  label{display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:5px}
+  .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;background:#fff}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(242,106,33,.12)}
+  .field textarea{resize:vertical;min-height:64px}
+  .modal-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:space-between;align-items:center;position:sticky;bottom:0;background:#fff}
+  .btn{padding:10px 18px;border-radius:9px;font-weight:700;font-size:14px;border:none}
+  .btn.primary{background:var(--orange);color:#fff}
+  .btn.primary:hover{background:var(--orange-dark)}
+  .btn.sec{background:#eef0f3;color:var(--ink)}
+  .btn.danger{background:none;color:var(--red);border:1px solid #f3c2c2}
+  .btn.danger:hover{background:#fdeaea}
+
+  /* Calendar */
+  .calhead{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .calhead h2{font-size:19px;font-weight:800;min-width:170px;margin-left:6px}
+  .calbtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 13px;font-weight:700;font-size:13px}
+  .calbtn:hover{border-color:var(--orange);color:var(--orange)}
+  .callegend{margin-left:auto;font-size:12px;color:var(--muted);display:flex;gap:14px;align-items:center;font-weight:600}
+  .callegend .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .cal-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;min-width:630px}
+  .caldow{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:2px 8px 6px}
+  .calcell{background:#fff;border:1px solid var(--line);border-radius:10px;min-height:98px;padding:6px;overflow:hidden}
+  .calcell.out{background:transparent;border-style:dashed;opacity:.4}
+  .calcell .dnum{font-weight:700;font-size:12px;color:var(--muted);margin-bottom:4px;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%}
+  .calcell.today{border-color:var(--orange)}
+  .calcell.today .dnum{background:var(--orange);color:#fff}
+  .calev{display:block;border:none;width:100%;text-align:left;border-radius:6px;padding:3px 7px;margin-bottom:3px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .calev.fu{background:#fff7e8;border:1px dashed #d97706;color:#92400e}
+
+  /* Staff calendar */
+  .staff-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .staffgrid{display:grid;grid-template-columns:130px repeat(7,1fr);gap:6px;min-width:760px}
+  .scorner{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;align-self:end}
+  .sday{font-size:12px;font-weight:700;color:var(--muted);padding:6px 8px;text-align:center;border-radius:8px}
+  .sday.today{background:var(--orange);color:#fff}
+  .slane{background:var(--ink);color:#fff;border-radius:10px;padding:10px 12px;font-weight:700;font-size:13px;display:flex;align-items:center;gap:7px;cursor:pointer;min-height:74px}
+  .slane:hover .pen{opacity:1}
+  .slane.pool{background:#fff;color:var(--ink);border:1px dashed #c9ccd2;cursor:default}
+  .slane .pen{opacity:.45;font-size:11px}
+  .scell{background:#fff;border:1px solid var(--line);border-radius:10px;min-height:74px;padding:5px}
+  .scell.today{border-color:#ffd0b3;background:#fffaf7}
+  .scell .calev{cursor:pointer}
+
+  /* Follow-up templates */
+  .tplbar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .tplbar select{flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;font-weight:600;background:#fff}
+  .tbtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:700;color:#374151;white-space:nowrap}
+  .tbtn:hover{border-color:var(--orange);color:var(--orange)}
+  #tplText.editing{border-color:var(--amber);box-shadow:0 0 0 3px rgba(217,119,6,.12)}
+  .tplactions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .tplactions .tbtn{flex:1;min-width:84px}
+
+  /* Address autocomplete */
+  .sug{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:30;max-height:220px;overflow-y:auto}
+  .sug div{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f1f3;font-weight:600}
+  .sug div:last-child{border-bottom:none}
+  .sug div:hover,.sug div.act{background:#fff3ec}
+  .sug .muted{color:var(--muted);font-size:12px;font-weight:500}
+
+  /* To-do list */
+  .todo{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  .todo input[type=checkbox]{width:18px;height:18px;accent-color:var(--orange);cursor:pointer;flex-shrink:0}
+  .todo .tx{flex:1;font-size:14px;font-weight:600}
+  .todo.done .tx{text-decoration:line-through;color:var(--muted);font-weight:500}
+  .todo .duechip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#f4f5f7;color:#5b6472;white-space:nowrap}
+  .todo .duechip.over{background:#fee2e2;color:#b91c1c}
+  .todo .del{background:none;border:none;color:#c1c5cd;font-size:16px;line-height:1}
+  .todo .del:hover{color:var(--red)}
+  .tsec{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:18px 0 8px;letter-spacing:.5px;display:flex;align-items:center}
+  .tinput{flex:2;min-width:220px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff}
+  .tinput:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(242,106,33,.12)}
+
+  /* Activity history */
+  .hist{border:1px solid var(--line);border-radius:9px;max-height:160px;overflow-y:auto;background:#fafbfc}
+  .h-item{padding:7px 11px;border-bottom:1px solid #eef0f3;font-size:12px;display:flex;gap:10px}
+  .h-item:last-child{border-bottom:none}
+  .h-time{color:#9aa0aa;white-space:nowrap;font-weight:600}
+
+  /* Map */
+  #map{height:calc(100vh - 210px);min-height:420px;border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);z-index:1;background:#dfe3e8}
+  .maplegend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+  .lchip{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 13px;font-size:12.5px;font-weight:700;cursor:pointer;user-select:none}
+  .lchip .dot{width:9px;height:9px;border-radius:50%}
+  .lchip.off{opacity:.38}
+  .mapnote{margin-left:auto;font-size:12px;color:var(--muted)}
+  .leaflet-popup-content{font-family:inherit;font-size:13px;margin:12px 14px;line-height:1.45}
+  .pop-name{font-weight:800;font-size:14px;margin-bottom:3px}
+  .pop-open{margin-top:8px;background:var(--orange);border:none;color:#fff;font-weight:700;font-size:12px;padding:6px 12px;border-radius:7px;cursor:pointer}
+  .pop-open:hover{background:var(--orange-dark)}
+
+  .hide{display:none!important}
+  .page{display:none}
+  .page.active{display:block}
+  ::-webkit-scrollbar{height:10px;width:10px}
+  ::-webkit-scrollbar-thumb{background:#c9ccd2;border-radius:20px}
+
+  /* ===== Responsive ===== */
+  @media(max-width:820px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .grid2{grid-template-columns:1fr}
+  }
+  @media(max-width:640px){
+    header{padding:0 12px;gap:10px;height:56px}
+    .brand{gap:8px}
+    .brand .mark,.brand .mark svg{width:26px;height:26px}
+    .brand .name{font-size:14px}
+    nav button{padding:9px 12px;font-size:13.5px}
+    .hbtn{padding:10px 12px;font-size:13.5px}
+    .wrap{padding:14px 12px 30px}
+    .stats{padding:14px 12px 4px;gap:10px}
+    .stat{padding:11px 13px}
+    .stat .v{font-size:22px}
+    .col{width:250px;min-width:250px}
+    .modal{border-radius:14px}
+    .modal-head{padding:14px 16px}
+    .modal-body{padding:16px}
+    .modal-foot{padding:12px 16px;flex-wrap:wrap}
+    .overlay{padding:0}
+    .overlay .modal{max-height:100vh;height:100%;border-radius:0}
+    .calhead h2{font-size:17px;min-width:auto}
+    .calcell{min-height:78px}
+    #map{height:calc(100vh - 190px)}
+    .toolbar{gap:8px}
+    .search{min-width:100%}
+    select.filter{flex:1;min-width:120px}
+  }
+  @media(max-width:480px){
+    .brand .name small{display:none}
+    .hbtn .lbl{display:none}
+    .hbtn{padding:10px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    nav button{padding:8px 10px;font-size:13px}
+  }
+  @media(hover:none) and (pointer:coarse){
+    nav button,.hbtn,.calbtn,.rowbtn,.tbtn,th,.todo .del,.lchip{min-height:40px}
+    .card,.todo,tbody tr td{padding-top:12px;padding-bottom:12px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark">
+      <svg viewBox="0 0 100 100" fill="none"><path d="M15 30h55l-12 20h-55z" fill="#F26A21"/><path d="M25 50h55l-12 20h-55z" fill="#F26A21"/><path d="M78 34l14 8-14 8z" fill="#F26A21"/></svg>
+    </div>
+    <div class="name">RAPID<small>OVEN CLEANING · CRM</small></div>
+  </div>
+  <nav>
+    <button id="nav-pipeline" class="active" onclick="showPage('pipeline')">Pipeline</button>
+    <button id="nav-clients" onclick="showPage('clients')">Clients Database</button>
+    <button id="nav-calendar" onclick="showPage('calendar')">Calendar</button>
+    <button id="nav-staff" onclick="showPage('staff')">Staff Calendar</button>
+    <button id="nav-map" onclick="showPage('map')">Map</button>
+    <button id="nav-projects" onclick="showPage('projects')">Projects</button>
+    <button id="nav-todo" onclick="showPage('todo')">To-Do</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="hbtn ghost" onclick="openFeedModal()" title="Connect your Zapier lead feed" aria-label="Lead feed"><span class="ic" id="feedDot">⚪</span><span class="lbl">Lead Feed</span></button>
+  <button class="hbtn ghost" onclick="exportCSV()" title="Export all clients to CSV" aria-label="Export"><span class="ic">⭳</span><span class="lbl">Export</span></button>
+  <button class="hbtn" onclick="openModal()" aria-label="New lead"><span class="ic">+</span><span class="lbl">New Lead</span></button>
+</header>
+
+<!-- ================= PIPELINE ================= -->
+<section id="page-pipeline" class="page active">
+  <div class="stats" id="stats"></div>
+  <div class="wrap">
+    <div class="board" id="board"></div>
+  </div>
+</section>
+
+<!-- ================= CLIENTS ================= -->
+<section id="page-clients" class="page">
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input id="search" placeholder="Search name, phone, email, suburb…" oninput="renderTable()">
+      </div>
+      <select class="filter" id="fStage" onchange="renderTable()">
+        <option value="">All stages</option>
+      </select>
+      <select class="filter" id="fSvc" onchange="renderTable()">
+        <option value="">All services</option>
+        <option>Oven Clean</option><option>BBQ Clean</option><option>Rangehood Clean</option><option>Stovetop Clean</option><option>Full Kitchen</option>
+      </select>
+    </div>
+    <div class="tablewrap">
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th onclick="sortBy('name')">Client</th>
+            <th onclick="sortBy('service')">Service</th>
+            <th onclick="sortBy('suburb')">Suburb</th>
+            <th onclick="sortBy('value')">Value</th>
+            <th onclick="sortBy('source')">Source</th>
+            <th onclick="sortBy('stage')">Stage</th>
+            <th onclick="sortBy('followUp')">Follow-up</th>
+            <th onclick="sortBy('createdAt')">Added</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="tableEmpty" class="empty hide">No clients match your search.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CALENDAR ================= -->
+<section id="page-calendar" class="page">
+  <div class="wrap">
+    <div class="calhead">
+      <button class="calbtn" onclick="calShift(-1)">‹</button>
+      <button class="calbtn" onclick="calToday()">Today</button>
+      <button class="calbtn" onclick="calShift(1)">›</button>
+      <h2 id="calTitle"></h2>
+      <div class="callegend">
+        <span><span class="sw" style="background:#16a34a"></span>Booked job</span>
+        <span><span class="sw" style="background:#fff7e8;border:1px dashed #d97706"></span>Follow-up due</span>
+      </div>
+    </div>
+    <div class="cal-scroll"><div class="calgrid" id="calGrid"></div></div>
+  </div>
+</section>
+
+<!-- ================= STAFF CALENDAR ================= -->
+<section id="page-staff" class="page">
+  <div class="wrap">
+    <div class="calhead">
+      <button class="calbtn" onclick="staffShift(-1)">‹</button>
+      <button class="calbtn" onclick="staffToday()">This Week</button>
+      <button class="calbtn" onclick="staffShift(1)">›</button>
+      <h2 id="staffTitle"></h2>
+      <div class="callegend"><span>💡 Tap a job to open it and reassign staff/day · click a staff name to rename</span></div>
+    </div>
+    <div class="staff-scroll"><div class="staffgrid" id="staffGrid"></div></div>
+  </div>
+</section>
+
+<!-- ================= MAP ================= -->
+<section id="page-map" class="page">
+  <div class="wrap">
+    <div class="maplegend" id="mapLegend"></div>
+    <div id="map"></div>
+  </div>
+</section>
+
+<!-- ================= PROJECTS ================= -->
+<section id="page-projects" class="page">
+  <div class="wrap">
+    <div class="toolbar">
+      <h2 style="font-size:19px;font-weight:800">Projects</h2>
+      <div style="flex:1"></div>
+      <button class="hbtn" onclick="openProject()">+ New Project</button>
+    </div>
+    <div class="board" id="pboard"></div>
+  </div>
+</section>
+
+<!-- ================= TO-DO ================= -->
+<section id="page-todo" class="page">
+  <div class="wrap" style="max-width:780px;margin:0 auto">
+    <div class="toolbar">
+      <input id="todoText" class="tinput" placeholder="Add a task… e.g. Order more degreaser">
+      <input id="todoDue" type="date" class="filter">
+      <button class="hbtn" onclick="addTodo()">+ Add</button>
+    </div>
+    <div id="todoList"></div>
+  </div>
+</section>
+
+<!-- ================= PROJECT MODAL ================= -->
+<div class="overlay" id="overlay2">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="pTitle">New Project</h3>
+      <button class="x" onclick="closeProject()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="p-id">
+      <div class="field full"><label>Project name *</label><input id="p-name" placeholder="e.g. Ray White end-of-lease contract"></div>
+      <div class="grid2">
+        <div class="field"><label>Client / Company</label><input id="p-client" placeholder="e.g. Ray White Cronulla"></div>
+        <div class="field"><label>Value ($)</label><input id="p-value" type="number" placeholder="2400"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Status</label><select id="p-status"><option value="planning">Planning</option><option value="active">In Progress</option><option value="done">Completed</option></select></div>
+        <div class="field"><label>Due date</label><input id="p-due" type="date"></div>
+      </div>
+      <div class="field full"><label>Notes</label><textarea id="p-notes" placeholder="Scope, contacts, next steps…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger" id="pDeleteBtn" onclick="deleteProject()">Delete</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn sec" onclick="closeProject()">Cancel</button>
+        <button class="btn primary" onclick="saveProject()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ZAPIER LEAD FEED MODAL ================= -->
+<div class="overlay" id="overlay3">
+  <div class="modal" style="width:520px">
+    <div class="modal-head">
+      <h3>Zapier Lead Feed</h3>
+      <button class="x" onclick="closeFeedModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.55">
+        Point this at a Google Sheet your Zapier automation adds new leads to as rows. New rows are pulled into <b>New Leads</b> automatically every ~45 seconds — no copy-pasting, and you don't need to keep this tab in the foreground.
+      </p>
+      <div class="field full">
+        <label>Google Sheet URL or ID</label>
+        <input id="feedSheetInput" placeholder="Paste the sheet's share link or ID">
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+        Expected column headers (any order): <b>Name, Phone, Email, Service, Suburb, Address, Value, Source, Notes</b>. Only <b>Name</b> is required.<br>
+        Sheet must be shared as <b>"Anyone with the link — Viewer"</b> (File → Share).
+      </div>
+      <div id="feedStatus" style="font-size:13px;font-weight:700;margin-bottom:4px">Not connected yet.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger" onclick="disconnectFeed()">Disconnect</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn sec" onclick="importFeedNow()">Import existing rows now</button>
+        <button class="btn primary" onclick="connectFeed()">Connect</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">New Lead</h3>
+      <button class="x" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="f-id">
+      <div class="field full">
+        <label>Name *</label>
+        <input id="f-name" placeholder="e.g. Sarah Thompson">
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Phone</label><input id="f-phone" placeholder="04__ ___ ___"></div>
+        <div class="field"><label>Email</label><input id="f-email" placeholder="name@email.com"></div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Service</label>
+          <select id="f-service"><option>Oven Clean</option><option>BBQ Clean</option><option>Rangehood Clean</option><option>Stovetop Clean</option><option>Full Kitchen</option></select>
+        </div>
+        <div class="field"><label>Suburb</label><input id="f-suburb" placeholder="e.g. Cronulla"></div>
+      </div>
+      <div class="field full" style="position:relative">
+        <label>Address</label>
+        <input id="f-address" placeholder="Start typing an address…" autocomplete="off" oninput="addrInput()" onkeydown="addrKey(event)">
+        <div id="addrSug" class="sug hide"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Quote value ($)</label><input id="f-value" type="number" placeholder="150"></div>
+        <div class="field">
+          <label>Source</label>
+          <select id="f-source"><option>Website</option><option>Meta / Facebook</option><option>Google</option><option>Referral</option><option>Repeat client</option><option>Phone</option><option>Other</option></select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>Stage</label>
+          <select id="f-stage"></select>
+        </div>
+        <div class="field">
+          <label>Follow-up date</label>
+          <input id="f-followup" type="date">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Job date (booked)</label><input id="f-jobdate" type="date"></div>
+        <div class="field"><label>Job time</label><input id="f-jobtime" type="time"></div>
+      </div>
+      <div class="field full">
+        <label>Assigned to (staff)</label>
+        <select id="f-assign"></select>
+      </div>
+      <div class="field full">
+        <label>Notes</label>
+        <textarea id="f-notes" placeholder="Job details, access notes, follow-up reminders…"></textarea>
+      </div>
+      <div class="field full">
+        <label>Follow-up message</label>
+        <div class="tplbar">
+          <select id="f-tpl" onchange="tplSelectChange()"></select>
+          <button class="tbtn" id="tplEditBtn" onclick="tplEditToggle()">✎ Edit template</button>
+        </div>
+        <textarea id="tplText" rows="4"></textarea>
+        <div class="tplactions">
+          <button class="tbtn" id="tplCopyBtn" onclick="tplCopy()">⎘ Copy</button>
+          <button class="tbtn" onclick="tplSms()">📱 Text</button>
+          <button class="tbtn" onclick="tplEmail()">✉ Email</button>
+        </div>
+      </div>
+      <div class="field full hide" id="histWrap">
+        <label>Activity history</label>
+        <div class="hist" id="histList"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger" id="deleteBtn" onclick="deleteLead()">Delete</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn sec" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" onclick="saveLead()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Supabase ---------- */
+const SUPABASE_URL = 'https://haarvltpfcbixqbwkxpl.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYXJ2bHRwZmNiaXhxYndreHBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4ODExMzAsImV4cCI6MjA5OTQ1NzEzMH0.vqLvv_N_tTsRgngxeOAUUIZowmfilvQrfFG6srkRLQM';
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+/* ---------- Stage config ---------- */
+const STAGES = [
+  {id:'new',      name:'New Leads',  color:'#F26A21'},
+  {id:'contacted',name:'Contacted',  color:'#2563eb'},
+  {id:'followup', name:'Follow Up',  color:'#d97706'},
+  {id:'quoted',   name:'Quoted',     color:'#7c3aed'},
+  {id:'won',      name:'Closed — Won',color:'#16a34a'},
+  {id:'lost',     name:'Closed — Lost',color:'#9aa0aa'},
+];
+const stageMap = Object.fromEntries(STAGES.map(s=>[s.id,s]));
+
+/* ---------- Data ---------- */
+let leads = [];
+let projects = [];
+let todos = [];
+let staff = ['Staff 1','Staff 2','Staff 3','Staff 4'];
+let tpls = [
+  {name:'New enquiry reply',text:'Hi {name}, thanks for reaching out to Rapid Oven Cleaning! We\'d love to help with your {service}. What day suits you best and we\'ll lock you in? — Rapid Oven Cleaning, 0457 978 972'},
+  {name:'Quote follow-up',text:'Hi {name}, just checking in on the quote we sent for your {service}{value}. Happy to answer any questions or book in a time that suits you. — Rapid Oven Cleaning'},
+  {name:'Missed call',text:'Hi {name}, we tried calling about your {service} enquiry but couldn\'t reach you. Reply here or give us a buzz on 0457 978 972 whenever suits. — Rapid Oven Cleaning'},
+  {name:'Booking confirmation',text:'Hi {name}, confirming your {service}{jobwhen}. We\'ll see you then — if anything changes just let us know on 0457 978 972. — Rapid Oven Cleaning'},
+  {name:'Review request',text:'Hi {name}, thanks for having Rapid Oven Cleaning out for your {service}! If you were happy with the result, a quick Google review would mean the world to us. Cheers!'},
+];
+let loading = true;
+
+function uid(){return 'l'+Date.now()+Math.random().toString(36).slice(2,6);}
+function logAct(l,text){(l.history=l.history||[]).push({ts:Date.now(),text});if(l.history.length>60)l.history=l.history.slice(-60);}
+
+/* ---------- Supabase helpers ---------- */
+async function fetchAll(table){
+  const {data,error}=await _sb.from(table).select('*').order('updated_at',{ascending:false});
+  if(error)throw error;
+  return data||[];
+}
+async function upsertRow(table,id,data){
+  const {error}=await _sb.from(table).upsert({id,data,updated_at:new Date().toISOString()},{onConflict:'id'});
+  if(error)throw error;
+}
+async function deleteRow(table,id){
+  const {error}=await _sb.from(table).delete().eq('id',id);
+  if(error)throw error;
+}
+async function loadAll(table,mapFn){
+  const rows=await fetchAll(table);
+  return rows.map(r=>{const o=r.data||{};o.id=r.id;return o;}).map(mapFn);
+}
+function subscribe(table,cb){
+  return _sb.channel(table+'-sync')
+    .on('postgres_changes',{event:'*',schema:'public',table:table},cb)
+    .subscribe();
+}
+
+/* ---------- Load all data ---------- */
+async function init(){
+  try{
+    // Load leads
+    const raw=await fetchAll('leads');
+    leads=raw.map(r=>{
+      const o=r.data||{};
+      o.id=r.id;
+      if(!o.history)o.history=[];
+      return o;
+    });
+    if(!leads.length)leads=seed();
+    // Load projects
+    const pra=await fetchAll('projects');
+    projects=pra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
+    if(!projects.length)projects=seedProjects();
+    // Load todos
+    const tra=await fetchAll('todos');
+    todos=tra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
+    if(!todos.length)todos=seedTodos();
+    // Load config
+    const cfg=await fetchAll('config');
+    const cfgData=cfg[0]&&cfg[0].data||{};
+    if(cfgData.staff)staff=cfgData.staff;
+    if(cfgData.tpls)tpls=cfgData.tpls;
+  }catch(e){
+    console.warn('Supabase load failed, using seed data:',e);
+    leads=seed();
+    projects=seedProjects();
+    todos=seedTodos();
+  }
+  loading=false;
+  fillStageSelects();
+  fillStaffSelect();
+  fillTplSelect();
+  renderBoard();
+  renderTodoBadge();
+  startRealtime();
+}
+
+/* ---------- Real-time sync ---------- */
+let syncTimer=null;
+function startRealtime(){
+  subscribe('leads',()=>{debounceSync('leads',async()=>{
+    const raw=await fetchAll('leads');
+    leads=raw.map(r=>{const o=r.data||{};o.id=r.id;if(!o.history)o.history=[];return o;});
+    if(!loading)refreshActive();
+    renderTodoBadge();
+  });});
+  subscribe('projects',()=>{debounceSync('projects',async()=>{
+    const pra=await fetchAll('projects');
+    projects=pra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
+    if(!loading&&document.getElementById('page-projects').classList.contains('active'))renderProjects();
+  });});
+  subscribe('todos',()=>{debounceSync('todos',async()=>{
+    const tra=await fetchAll('todos');
+    todos=tra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
+    if(!loading&&document.getElementById('page-todo').classList.contains('active'))renderTodos();
+    renderTodoBadge();
+  });});
+  subscribe('config',()=>{debounceSync('config',async()=>{
+    const cfg=await fetchAll('config');
+    const cfgData=cfg[0]&&cfg[0].data||{};
+    if(cfgData.staff)staff=cfgData.staff;
+    if(cfgData.tpls)tpls=cfgData.tpls;
+    if(!loading)fillStaffSelect();
+    if(!loading)fillTplSelect();
+  });});
+}
+const syncQueue={};
+function debounceSync(key,fn){
+  syncQueue[key]=fn;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(async()=>{
+    for(const k of Object.keys(syncQueue)){try{await syncQueue[k]();}catch(e){}}
+    syncQueue={};
+  },300);
+}
+
+/* ---------- Seed data ---------- */
+function seed(){
+  const now=Date.now(),D=86400000,ds=t=>dToStr(t);
+  const h=(t,txt)=>({ts:t,text:txt});
+  return [
+    {id:uid(),name:'Sarah Thompson',phone:'0412 334 556',email:'sarah.t@email.com',service:'Oven Clean',suburb:'Cronulla',address:'12 Gerrale St',value:180,source:'Website',stage:'new',notes:'Wants weekend booking. Double oven.',createdAt:now-2*3600000,followUp:ds(now),history:[h(now-2*3600000,'Lead created — Website')]},
+    {id:uid(),name:'Michael Nguyen',phone:'0433 210 998',email:'mnguyen@email.com',service:'BBQ Clean',suburb:'Miranda',value:150,source:'Meta / Facebook',stage:'new',notes:'6-burner BBQ, pre-Christmas.',createdAt:now-6*3600000,history:[h(now-6*3600000,'Lead created — Meta / Facebook')]},
+    {id:uid(),name:'Priya Sharma',phone:'0401 556 223',email:'priya.s@email.com',service:'Full Kitchen',suburb:'Hurstville',value:420,source:'Google',stage:'contacted',notes:'Called, left voicemail. Try again tomorrow.',createdAt:now-1*D,followUp:ds(now+1*D),history:[h(now-1*D,'Lead created — Google'),h(now-20*3600000,'Moved to Contacted'),h(now-20*3600000,'Follow-up set for tomorrow')]},
+    {id:uid(),name:'James O\'Brien',phone:'0455 887 001',email:'jobrien@email.com',service:'Rangehood Clean',suburb:'Sutherland',value:120,source:'Referral',stage:'followup',notes:'Asked to call back after 15th.',createdAt:now-3*D,followUp:ds(now-1*D),history:[h(now-3*D,'Lead created — Referral'),h(now-2*D,'Moved to Follow Up')]},
+    {id:uid(),name:'Emma Wilson',phone:'0422 665 447',email:'emmaw@email.com',service:'Oven Clean',suburb:'Caringbah',value:160,source:'Website',stage:'quoted',notes:'Quote sent via email. Awaiting reply.',createdAt:now-4*D,followUp:ds(now+2*D),history:[h(now-4*D,'Lead created — Website'),h(now-3*D,'Moved to Quoted')]},
+    {id:uid(),name:'David Chen',phone:'0466 223 118',email:'dchen@email.com',service:'Full Kitchen',suburb:'Kogarah',address:'3/45 Princes Hwy',value:390,source:'Repeat client',stage:'won',notes:'Paid deposit.',createdAt:now-5*D,jobDate:ds(now+2*D),jobTime:'09:00',assignedTo:'s1',history:[h(now-5*D,'Lead created — Repeat client'),h(now-4*D,'Moved to Closed — Won'),h(now-4*D,'Job booked')]},
+    {id:uid(),name:'Lucy Martin',phone:'0400 998 776',email:'lucym@email.com',service:'Stovetop Clean',suburb:'Sylvania',value:110,source:'Meta / Facebook',stage:'won',notes:'Completed. 5-star review left.',createdAt:now-8*D,jobDate:ds(now-2*D),jobTime:'13:30',history:[h(now-8*D,'Lead created — Meta / Facebook'),h(now-6*D,'Moved to Closed — Won')]},
+    {id:uid(),name:'Tom Baker',phone:'0411 445 990',email:'tbaker@email.com',service:'BBQ Clean',suburb:'Engadine',value:140,source:'Google',stage:'lost',notes:'Went with cheaper quote.',createdAt:now-10*D,history:[h(now-10*D,'Lead created — Google'),h(now-7*D,'Moved to Closed — Lost')]},
+  ];
+}
+function seedProjects(){
+  const now=Date.now(),D=86400000;
+  return[
+    {id:uid(),name:'End-of-lease ovens — Ray White',client:'Ray White Cronulla',value:2400,status:'active',due:dToStr(now+14*D),notes:'12 units to schedule across the month.',createdAt:now},
+    {id:uid(),name:'Strata BBQ area deep clean',client:'Sutherland Strata Group',value:950,status:'planning',due:dToStr(now+30*D),notes:'Waiting on committee approval.',createdAt:now},
+  ];
+}
+function seedTodos(){
+  const now=Date.now(),D=86400000;
+  return[
+    {id:uid(),text:'Call back James O\'Brien about rangehood quote',due:dToStr(now),done:false,createdAt:now},
+    {id:uid(),text:'Order degreaser + steel wool refills',due:'',done:false,createdAt:now-1},
+    {id:uid(),text:'Post before/after photos to Facebook page',due:dToStr(now+2*D),done:false,createdAt:now-2},
+  ];
+}
+
+/* ---------- Persist helpers ---------- */
+async function saveLeads(){
+  await Promise.all(leads.map(l=>{
+    const {id,...data}=l;
+    return upsertRow('leads',id,data);
+  }));
+}
+async function saveLead(l){
+  const {id,...data}=l;
+  await upsertRow('leads',id,data);
+}
+async function deleteLeadDb(id){
+  await deleteRow('leads',id);
+}
+async function saveProjects(){
+  await Promise.all(projects.map(p=>{
+    const {id,...data}=p;
+    return upsertRow('projects',id,data);
+  }));
+}
+async function saveProject(p){
+  const {id,...data}=p;
+  await upsertRow('projects',id,data);
+}
+async function deleteProjectDb(id){
+  await deleteRow('projects',id);
+}
+async function saveTodos(){
+  await Promise.all(todos.map(t=>{
+    const {id,...data}=t;
+    return upsertRow('todos',id,data);
+  }));
+}
+async function saveTodo(t){
+  const {id,...data}=t;
+  await upsertRow('todos',id,data);
+}
+async function deleteTodoDb(id){
+  await deleteRow('todos',id);
+}
+async function saveConfig(){
+  const data={staff,tpls};
+  const cfg=await fetchAll('config');
+  if(cfg.length){
+    await _sb.from('config').update({data,updated_at:new Date().toISOString()}).eq('id',cfg[0].id);
+  }else{
+    await _sb.from('config').insert({id:'default',data,updated_at:new Date().toISOString()});
+  }
+}
+
+/* ---------- Navigation ---------- */
+function showPage(p){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  ['pipeline','clients','calendar','staff','map','projects','todo'].forEach(x=>document.getElementById('nav-'+x).classList.toggle('active',x===p));
+  if(p==='clients')renderTable();else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else renderBoard();
+}
+function refreshActive(){
+  if(document.getElementById('page-clients').classList.contains('active'))renderTable();
+  else if(document.getElementById('page-map').classList.contains('active'))renderMap();
+  else if(document.getElementById('page-calendar').classList.contains('active'))renderCal();
+  else if(document.getElementById('page-staff').classList.contains('active'))renderStaff();
+  else renderBoard();
+}
+
+/* ---------- Helpers ---------- */
+function money(n){return n?'$'+Number(n).toLocaleString():'';}
+function ago(ts){
+  const s=(Date.now()-ts)/1000;
+  if(s<3600)return Math.max(1,Math.floor(s/60))+'m ago';
+  if(s<86400)return Math.floor(s/3600)+'h ago';
+  const d=Math.floor(s/86400);return d===1?'yesterday':d+'d ago';
+}
+function fdate(ts){return new Date(ts).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}
+function dToStr(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function todayStr(){return dToStr(Date.now());}
+function fmtD(s){if(!s)return'';const p=s.split('-');return(+p[2])+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][p[1]-1];}
+function fmtTime12(t){if(!t)return'';let[hh,mm]=t.split(':');hh=+hh;const ap=hh>=12?'pm':'am';hh=hh%12||12;return hh+(mm!=='00'?':'+mm:'')+ap;}
+function esc(s){return (s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));}
+function telLink(p,stop){return p?`<a class=\"tel\" draggable=\"false\" href=\"tel:${p.replace(/[^\\d+]/g,'')}\"${stop?' onclick=\"event.stopPropagation()\"':''}>${esc(p)}</a>`:'';}
+function mapsLink(l){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([l.address,l.suburb,'NSW'].filter(Boolean).join(', '));}
+function placeLink(l,stop){
+  if(!l.address&&!l.suburb)return'';
+  const txt=[l.address,l.suburb].filter(Boolean).join(', ');
+  return`<a class=\"tel\" draggable=\"false\" href=\"${mapsLink(l)}\" target=\"_blank\" rel=\"noopener\" title=\"Open in Google Maps\"${stop?' onclick=\"event.stopPropagation()\"':''}>${esc(txt)}</a>`;
+}
+
+/* ---------- Stats ---------- */
+function renderStats(){
+  const monthAgo=Date.now()-30*86400000;
+  const nNew=leads.filter(l=>l.stage==='new').length;
+  const active=leads.filter(l=>['contacted','followup','quoted'].includes(l.stage)).length;
+  const wonThisMonth=leads.filter(l=>l.stage==='won'&&l.createdAt>monthAgo);
+  const revenue=leads.filter(l=>l.stage==='won').reduce((a,l)=>a+(+l.value||0),0);
+  const pipeValue=leads.filter(l=>['new','contacted','followup','quoted'].includes(l.stage)).reduce((a,l)=>a+(+l.value||0),0);
+  const closed=leads.filter(l=>['won','lost'].includes(l.stage)).length;
+  const conv=closed?Math.round(leads.filter(l=>l.stage==='won').length/closed*100):0;
+  const t=todayStr();
+  const due=leads.filter(l=>l.followUp&&l.followUp<=t&&!['won','lost'].includes(l.stage)).length;
+  document.getElementById('stats').innerHTML=`
+    <div class="stat accent"><div class="k">New Leads</div><div class="v">${nNew}</div></div>
+    <div class="stat"><div class="k">Follow-ups Due</div><div class="v" style="${due?'color:var(--red)':''}">${due}</div></div>
+    <div class="stat"><div class="k">In Progress</div><div class="v">${active}</div></div>
+    <div class="stat"><div class="k">Pipeline Value</div><div class="v">${money(pipeValue)||'$0'}</div></div>
+    <div class="stat"><div class="k">Won (revenue)</div><div class="v" style="color:var(--green)">${money(revenue)||'$0'}</div></div>
+    <div class="stat"><div class="k">Win Rate</div><div class="v">${conv}<small>%</small></div></div>`;
+}
+
+/* ---------- Move ---------- */
+function moveLeadTo(id,stageId){
+  const s=STAGES.find(x=>x.id===stageId);
+  const lead=leads.find(x=>x.id===id);
+  if(lead&&s&&lead.stage!==s.id){logAct(lead,'Moved to '+s.name);lead.stage=s.id;saveLead(lead);renderBoard();}
+}
+function moveProjectTo(id,statusId){
+  const s=PSTAGES.find(x=>x.id===statusId);
+  const p=projects.find(x=>x.id===id);
+  if(p&&s&&p.status!==s.id){p.status=s.id;saveProject(p);renderProjects();}
+}
+
+/* ---------- Board ---------- */
+function renderBoard(){
+  renderStats();
+  const board=document.getElementById('board');
+  board.innerHTML='';
+  STAGES.forEach(s=>{
+    const items=leads.filter(l=>l.stage===s.id).sort((a,b)=>b.createdAt-a.createdAt);
+    const col=document.createElement('div');
+    col.className='col';col.dataset.stage=s.id;
+    col.innerHTML=`<div class="col-head"><span class="dot" style="background:${s.color}"></span><span class="t">${s.name}</span><span class="c">${items.length}</span></div><div class="col-body"></div>`;
+    const body=col.querySelector('.col-body');
+    items.forEach(l=>body.appendChild(cardEl(l)));
+    board.appendChild(col);
+  });
+}
+function cardEl(l){
+  const d=document.createElement('div');
+  d.className='card';d.style.borderLeftColor=stageMap[l.stage].color;
+  d.innerHTML=`
+    <div class="cn"><span>${esc(l.name)}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
+    <div class="meta">
+      ${(l.address||l.suburb)?`<span>📍 ${placeLink(l,true)}</span>`:''}
+      ${l.phone?`<span>📞 ${telLink(l.phone,true)}</span>`:''}
+    </div>
+    <div class="chips">
+      <span class="chip svc">${esc(l.service)}</span>
+      <span class="chip src">${esc(l.source)}</span>
+      ${fuChip(l)}
+      ${l.jobDate?`<span class="chip job">📅 ${fmtD(l.jobDate)}${l.jobTime?' '+fmtTime12(l.jobTime):''}</span>`:''}
+    </div>
+    ${l.notes?`<div class="age" style="color:#5b6472;margin-top:8px">📝 ${esc(l.notes).slice(0,70)}${l.notes.length>70?'…':''}</div>`:''}
+    <div class="age">Added ${ago(l.createdAt)}</div>`;
+  d.addEventListener('click',()=>openModal(l.id));
+  return d;
+}
+function fuChip(l){
+  if(!l.followUp||['won','lost'].includes(l.stage))return'';
+  const t=todayStr();
+  if(l.followUp<t)return`<span class="chip due over">⚠ Overdue ${fmtD(l.followUp)}</span>`;
+  if(l.followUp===t)return`<span class="chip due today">☎ Follow up today</span>`;
+  return`<span class="chip due">☎ ${fmtD(l.followUp)}</span>`;
+}
+
+/* ---------- Table ---------- */
+let sortKey='createdAt',sortDir=-1;
+function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();}
+function renderTable(){
+  const q=document.getElementById('search').value.toLowerCase().trim();
+  const fs=document.getElementById('fStage').value;
+  const fsvc=document.getElementById('fSvc').value;
+  let rows=leads.filter(l=>{
+    if(fs&&l.stage!==fs)return false;
+    if(fsvc&&l.service!==fsvc)return false;
+    if(q){const hay=`${l.name} ${l.phone} ${l.email} ${l.suburb} ${l.address||''} ${l.service} ${l.source}`.toLowerCase();if(!hay.includes(q))return false;}
+    return true;
+  });
+  rows.sort((a,b)=>{let x=a[sortKey]??'',y=b[sortKey]??'';if(sortKey==='value'){x=+x||0;y=+y||0;}if(typeof x==='string'){x=x.toLowerCase();y=(''+y).toLowerCase();}return x<y?-sortDir:x>y?sortDir:0;});
+  const tb=document.getElementById('tbody');
+  tb.innerHTML=rows.map(l=>{
+    const st=stageMap[l.stage];
+    return `<tr onclick="rowOpen(event,'${l.id}')">
+      <td class="name-cell">${esc(l.name)}<small>${telLink(l.phone)}${l.phone&&l.email?' · ':''}${esc(l.email||'')}</small></td>
+      <td>${esc(l.service)}</td>
+      <td>${esc(l.suburb||'—')}${l.address?`<br><a class="tel" style="font-size:12px;color:var(--muted)" href="${mapsLink(l)}" target="_blank" rel="noopener">${esc(l.address)}</a>`:''}</td>
+      <td>${money(l.value)||'—'}</td>
+      <td>${esc(l.source)}</td>
+      <td><span class="badge" style="background:${st.color}1a;color:${st.color}">${st.name}</span></td>
+      <td style="white-space:nowrap">${fuCell(l)}</td>
+      <td style="color:var(--muted);white-space:nowrap">${fdate(l.createdAt)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tableEmpty').classList.toggle('hide',rows.length>0);
+}
+function rowOpen(e,id){if(e.target.closest('a,button'))return;openModal(id);}
+function fuCell(l){
+  if(!l.followUp)return'<span style="color:var(--muted)">—</span>';
+  const t=todayStr(),closed=['won','lost'].includes(l.stage);
+  const c=closed?'var(--muted)':l.followUp<t?'var(--red)':l.followUp===t?'var(--amber)':'inherit';
+  const w=(!closed&&l.followUp<=t)?'700':'500';
+  return`<span style="color:${c};font-weight:${w}">${fmtD(l.followUp)}${!closed&&l.followUp<t?' ⚠':''}</span>`;
+}
+
+/* ---------- Modal ---------- */
+function fillStageSelects(){
+  const opts=STAGES.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  document.getElementById('f-stage').innerHTML=opts;
+  document.getElementById('fStage').innerHTML='<option value="">All stages</option>'+opts;
+}
+function openModal(id){
+  const o=document.getElementById('overlay');o.classList.add('open');
+  addrPick=null;hideSug();
+  if(id){
+    const l=leads.find(x=>x.id===id);
+    document.getElementById('modalTitle').textContent='Edit Lead';
+    document.getElementById('f-id').value=l.id;
+    document.getElementById('f-name').value=l.name;
+    document.getElementById('f-phone').value=l.phone||'';
+    document.getElementById('f-email').value=l.email||'';
+    document.getElementById('f-service').value=l.service;
+    document.getElementById('f-suburb').value=l.suburb||'';
+    document.getElementById('f-address').value=l.address||'';
+    document.getElementById('f-value').value=l.value||'';
+    document.getElementById('f-source').value=l.source;
+    document.getElementById('f-stage').value=l.stage;
+    document.getElementById('f-followup').value=l.followUp||'';
+    document.getElementById('f-jobdate').value=l.jobDate||'';
+    document.getElementById('f-jobtime').value=l.jobTime||'';
+    document.getElementById('f-assign').value=l.assignedTo||'';
+    document.getElementById('f-notes').value=l.notes||'';
+    document.getElementById('deleteBtn').style.display='';
+    renderHist(l);
+    document.getElementById('histWrap').classList.remove('hide');
+    tplSelectChange();
+  }else{
+    document.getElementById('modalTitle').textContent='New Lead';
+    ['f-id','f-name','f-phone','f-email','f-suburb','f-address','f-value','f-followup','f-jobdate','f-jobtime','f-notes'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('f-service').value='Oven Clean';
+    document.getElementById('f-source').value='Website';
+    document.getElementById('f-stage').value='new';
+    document.getElementById('f-assign').value='';
+    document.getElementById('deleteBtn').style.display='none';
+    document.getElementById('histWrap').classList.add('hide');
+    tplSelectChange();
+    setTimeout(()=>document.getElementById('f-name').focus(),50);
+  }
+}
+function renderHist(l){
+  const items=(l.history||[]).slice().reverse();
+  document.getElementById('histList').innerHTML=items.map(e=>{
+    const d=new Date(e.ts);
+    const when=d.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'});
+    return`<div class="h-item"><span class="h-time">${when}</span><span>${esc(e.text)}</span></div>`;
+  }).join('')||'<div class="h-item">No activity yet.</div>';
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open');}
+async function saveLead(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){document.getElementById('f-name').focus();return;}
+  const id=document.getElementById('f-id').value;
+  const data={
+    name,
+    phone:document.getElementById('f-phone').value.trim(),
+    email:document.getElementById('f-email').value.trim(),
+    service:document.getElementById('f-service').value,
+    suburb:document.getElementById('f-suburb').value.trim(),
+    address:document.getElementById('f-address').value.trim(),
+    value:document.getElementById('f-value').value,
+    source:document.getElementById('f-source').value,
+    stage:document.getElementById('f-stage').value,
+    followUp:document.getElementById('f-followup').value,
+    jobDate:document.getElementById('f-jobdate').value,
+    jobTime:document.getElementById('f-jobtime').value,
+    assignedTo:document.getElementById('f-assign').value,
+    notes:document.getElementById('f-notes').value.trim(),
+  };
+  if(id){
+    const l=leads.find(x=>x.id===id);
+    const addrChanged=data.address!==(l.address||'');
+    if(data.stage!==l.stage)logAct(l,'Moved to '+stageMap[data.stage].name);
+    if(data.assignedTo!==(l.assignedTo||''))logAct(l,data.assignedTo?'Assigned to '+staffName(data.assignedTo):'Moved back to All Bookings');
+    if(data.followUp!==(l.followUp||''))logAct(l,data.followUp?'Follow-up set for '+fmtD(data.followUp):'Follow-up cleared');
+    if(data.jobDate!==(l.jobDate||'')||data.jobTime!==(l.jobTime||''))logAct(l,data.jobDate?'Job booked for '+fmtD(data.jobDate)+(data.jobTime?' at '+fmtTime12(data.jobTime):''):'Job date cleared');
+    const snap=o=>JSON.stringify([o.name,o.phone,o.email,o.service,o.suburb,o.address||'',''+(o.value||''),o.source,o.notes]);
+    if(snap(l)!==snap(data))logAct(l,'Details updated');
+    Object.assign(l,data);
+    if(addrPick){l.lat=addrPick.lat;l.lng=addrPick.lng;}
+    else if(addrChanged){delete l.lat;delete l.lng;}
+    await saveLead(l);
+  }else{
+    const nl={id:uid(),createdAt:Date.now(),history:[],...data};
+    if(addrPick){nl.lat=addrPick.lat;nl.lng=addrPick.lng;}
+    logAct(nl,'Lead created — '+data.source);
+    if(data.followUp)logAct(nl,'Follow-up set for '+fmtD(data.followUp));
+    if(data.jobDate)logAct(nl,'Job booked for '+fmtD(data.jobDate)+(data.jobTime?' at '+fmtTime12(data.jobTime):''));
+    if(data.assignedTo)logAct(nl,'Assigned to '+staffName(data.assignedTo));
+    leads.push(nl);
+    await saveLead(nl);
+  }
+  closeModal();refreshActive();
+}
+async function deleteLead(){
+  const id=document.getElementById('f-id').value;
+  if(!id)return;
+  if(!confirm('Delete this lead permanently?'))return;
+  leads=leads.filter(x=>x.id!==id);await deleteLeadDb(id);closeModal();refreshActive();
+}
+
+/* ---------- Address autocomplete ---------- */
+let addrTimer=null,addrPick=null,sugIdx=-1,addrSeq=0;
+function addrInput(){
+  addrPick=null;
+  const q=document.getElementById('f-address').value.trim();
+  clearTimeout(addrTimer);
+  if(q.length<3){hideSug();return;}
+  addrTimer=setTimeout(()=>addrSearch(q),300);
+}
+async function addrSearch(q){
+  const myq=++addrSeq;
+  try{
+    let list=[];
+    try{
+      const r=await fetch('https://photon.komoot.io/api/?limit=6&lang=en&lat=-33.8688&lon=151.2093&bbox=149.9,-34.9,151.8,-32.9&q='+encodeURIComponent(q));
+      const d=await r.json();
+      list=(d.features||[]).map(f=>{
+        const p=f.properties||{};
+        return{
+          street:[p.housenumber,p.street||p.name].filter(Boolean).join(' '),
+          suburb:p.district||p.suburb||p.city||'',
+          postcode:p.postcode||'',
+          lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],
+          hasNum:!!p.housenumber
+        };
+      }).filter(x=>x.street);
+    }catch(e){}
+    if(!list.length){
+      const r2=await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=au&q='+encodeURIComponent(q+', NSW'));
+      const d2=await r2.json();
+      list=(d2||[]).map(x=>{
+        const a=x.address||{};
+        return{
+          street:[a.house_number,a.road].filter(Boolean).join(' ')||x.display_name.split(',')[0],
+          suburb:a.suburb||a.town||a.city||a.village||'',
+          postcode:a.postcode||'',
+          lat:+x.lat,lng:+x.lon,
+          hasNum:!!a.house_number
+        };
+      });
+    }
+    if(myq!==addrSeq)return;
+    const seen=new Set();
+    list=list.filter(x=>{const k=(x.street+'|'+x.suburb).toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+    if(!list.length){hideSug();return;}
+    const num=(q.match(/^\s*(\d+[a-zA-Z]?(?:\/\d+[a-zA-Z]?)?)\s/)||[])[1];
+    list.forEach(x=>{if(num&&!x.hasNum)x.street=num+' '+x.street;});
+    const el=document.getElementById('addrSug');
+    el._data=list;sugIdx=-1;
+    el.innerHTML=list.map((x,i)=>`<div onclick="pickAddr(${i})">📍 ${esc(x.street)}<span class="muted">${(x.suburb||x.postcode)?' — '+esc([x.suburb,x.postcode].filter(Boolean).join(' ')):''}</span></div>`).join('');
+    el.classList.remove('hide');
+  }catch(e){if(myq===addrSeq)hideSug();}
+}
+function addrKey(e){
+  const el=document.getElementById('addrSug');
+  if(el.classList.contains('hide'))return;
+  const items=[...el.children];
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    sugIdx+=(e.key==='ArrowDown'?1:-1);
+    if(sugIdx<0)sugIdx=items.length-1;
+    if(sugIdx>=items.length)sugIdx=0;
+    items.forEach((d,i)=>d.classList.toggle('act',i===sugIdx));
+    return;
+  }
+  if(e.key==='Enter'){e.preventDefault();pickAddr(sugIdx>=0?sugIdx:0);}
+}
+function pickAddr(i){
+  const el=document.getElementById('addrSug');
+  const x=el._data&&el._data[i];if(!x)return;
+  document.getElementById('f-address').value=x.street;
+  if(x.suburb)document.getElementById('f-suburb').value=x.suburb;
+  addrPick={lat:x.lat,lng:x.lng};
+  hideSug();
+  tplPreview();
+}
+function hideSug(){const el=document.getElementById('addrSug');if(el){el.classList.add('hide');}sugIdx=-1;}
+
+/* ---------- Projects ---------- */
+const PSTAGES=[{id:'planning',name:'Planning',color:'#2563eb'},{id:'active',name:'In Progress',color:'#F26A21'},{id:'done',name:'Completed',color:'#16a34a'}];
+function renderProjects(){
+  const board=document.getElementById('pboard');board.innerHTML='';
+  const t=todayStr();
+  PSTAGES.forEach(s=>{
+    const items=projects.filter(p=>p.status===s.id).sort((a,b)=>(a.due||'9999')<(b.due||'9999')?-1:1);
+    const col=document.createElement('div');
+    col.className='col';col.dataset.pstage=s.id;col.style.width='320px';col.style.minWidth='320px';
+    col.innerHTML=`<div class="col-head"><span class="dot" style="background:${s.color}"></span><span class="t">${s.name}</span><span class="c">${items.length}</span></div><div class="col-body"></div>`;
+    const body=col.querySelector('.col-body');
+    items.forEach(p=>{
+      const over=p.due&&p.due<t&&p.status!=='done';
+      const d=document.createElement('div');
+      d.className='card';d.style.borderLeftColor=s.color;
+      d.innerHTML=`<div class="cn"><span>${esc(p.name)}</span><span class="cn-r">${p.value?`<span class="val">${money(p.value)}</span>`:''}<select class="stagesel" title="Move to another status" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveProjectTo('${p.id}',this.value)">${PSTAGES.map(s=>`<option value="${s.id}"${s.id===p.status?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
+        ${p.client?`<div class="meta"><span>🏢 ${esc(p.client)}</span></div>`:''}
+        ${p.notes?`<div class="age" style="color:#5b6472;margin-top:8px">${esc(p.notes).slice(0,80)}${p.notes.length>80?'…':''}</div>`:''}
+        ${p.due?`<div class="age"${over?' style="color:var(--red);font-weight:700"':''}>📅 Due ${fmtD(p.due)}${over?' — overdue':''}</div>`:''}`;
+      d.addEventListener('click',()=>openProject(p.id));
+      body.appendChild(d);
+    });
+    board.appendChild(col);
+  });
+}
+function openProject(id){
+  document.getElementById('overlay2').classList.add('open');
+  if(id){
+    const p=projects.find(x=>x.id===id);
+    document.getElementById('pTitle').textContent='Edit Project';
+    document.getElementById('p-id').value=p.id;
+    document.getElementById('p-name').value=p.name;
+    document.getElementById('p-client').value=p.client||'';
+    document.getElementById('p-value').value=p.value||'';
+    document.getElementById('p-status').value=p.status;
+    document.getElementById('p-due').value=p.due||'';
+    document.getElementById('p-notes').value=p.notes||'';
+    document.getElementById('pDeleteBtn').style.display='';
+  }else{
+    document.getElementById('pTitle').textContent='New Project';
+    ['p-id','p-name','p-client','p-value','p-due','p-notes'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('p-status').value='planning';
+    document.getElementById('pDeleteBtn').style.display='none';
+    setTimeout(()=>document.getElementById('p-name').focus(),50);
+  }
+}
+function closeProject(){document.getElementById('overlay2').classList.remove('open');}
+async function saveProject(){
+  const name=document.getElementById('p-name').value.trim();
+  if(!name){document.getElementById('p-name').focus();return;}
+  const id=document.getElementById('p-id').value;
+  const data={
+    name,
+    client:document.getElementById('p-client').value.trim(),
+    value:document.getElementById('p-value').value,
+    status:document.getElementById('p-status').value,
+    due:document.getElementById('p-due').value,
+    notes:document.getElementById('p-notes').value.trim(),
+  };
+  if(id)Object.assign(projects.find(x=>x.id===id),data);
+  else projects.push({id:uid(),createdAt:Date.now(),...data});
+  await saveProject(projects.find(x=>x.id===id||x.id===uid()));
+  closeProject();
+}
+async function deleteProject(){
+  const id=document.getElementById('p-id').value;
+  if(!id||!confirm('Delete this project permanently?'))return;
+  projects=projects.filter(x=>x.id!==id);
+  await deleteProjectDb(id);
+  closeProject();renderProjects();
+}
+
+/* ---------- To-do list ---------- */
+function addTodo(){
+  const t=document.getElementById('todoText');
+  const txt=t.value.trim();
+  if(!txt)return;
+  const todo={id:uid(),text:txt,due:document.getElementById('todoDue').value,done:false,createdAt:Date.now()};
+  todos.push(todo);
+  t.value='';document.getElementById('todoDue').value='';t.focus();
+  saveTodo(todo);renderTodos();
+}
+function toggleTodo(id){const x=todos.find(t=>t.id===id);if(x){x.done=!x.done;saveTodo(x);renderTodos();}}
+function delTodo(id){todos=todos.filter(t=>t.id!==id);deleteTodoDb(id);renderTodos();}
+function clearDone(){todos=todos.filter(t=>!t.done);saveTodos();renderTodos();}
+function renderTodos(){
+  const t=todayStr();
+  const pend=todos.filter(x=>!x.done).sort((a,b)=>{const x=a.due||'9999-99-99',y=b.due||'9999-99-99';return x<y?-1:x>y?1:a.createdAt-b.createdAt;});
+  const done=todos.filter(x=>x.done);
+  const item=x=>`<div class="todo${x.done?' done':''}">
+    <input type="checkbox" ${x.done?'checked':''} onchange="toggleTodo('${x.id}')">
+    <span class="tx">${esc(x.text)}</span>
+    ${x.due?`<span class="duechip${(!x.done&&x.due<t)?' over':''}">${x.due===t?'Today':fmtD(x.due)}${(!x.done&&x.due<t)?' ⚠':''}</span>`:''}
+    <button class="del" onclick="delTodo('${x.id}')" title="Delete">✕</button>
+  </div>`;
+  document.getElementById('todoList').innerHTML=
+    (pend.map(item).join('')||'<div class="empty">Nothing to do — nice one! 🎉</div>')+
+    (done.length?`<div class="tsec">Completed (${done.length})<button class="rowbtn" style="margin-left:10px" onclick="clearDone()">Clear</button></div>`+done.map(item).join(''):'');
+}
+function renderTodoBadge(){
+  const n=todos.filter(x=>!x.done).length;
+  document.getElementById('nav-todo').textContent=n?`To-Do (${n})`:'To-Do';
+}
+
+/* ---------- Calendar ---------- */
+let calY=new Date().getFullYear(),calM=new Date().getMonth();
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function calShift(n){calM+=n;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
+function calToday(){const d=new Date();calY=d.getFullYear();calM=d.getMonth();renderCal();}
+function renderCal(){
+  document.getElementById('calTitle').textContent=MONTHS[calM]+' '+calY;
+  const start=(new Date(calY,calM,1).getDay()+6)%7;
+  const dim=new Date(calY,calM+1,0).getDate();
+  const t=todayStr();
+  let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="caldow">${d}</div>`).join('');
+  const total=Math.ceil((start+dim)/7)*7;
+  for(let i=0;i<total;i++){
+    const day=i-start+1;
+    if(day<1||day>dim){html+='<div class="calcell out"></div>';continue;}
+    const ds=calY+'-'+String(calM+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    const jobs=leads.filter(l=>l.jobDate===ds).sort((a,b)=>(a.jobTime||'')<(b.jobTime||'')?-1:1);
+    const fus=leads.filter(l=>l.followUp===ds&&!['won','lost'].includes(l.stage));
+    html+=`<div class="calcell${ds===t?' today':''}"><span class="dnum">${day}</span>`
+      +jobs.map(l=>`<button class="calev" style="background:${stageMap[l.stage].color}" onclick="openModal('${l.id}')" title="${esc(l.name)} — ${esc(l.service)}${l.suburb?', '+esc(l.suburb):''}${l.assignedTo?' · '+esc(staffName(l.assignedTo)):''}">${l.jobTime?fmtTime12(l.jobTime)+' ':''}${esc(l.name)}${l.assignedTo?' · '+esc(initials(staffName(l.assignedTo))):''}</button>`).join('')
+      +fus.map(l=>`<button class="calev fu" onclick="openModal('${l.id}')" title="Follow up ${esc(l.name)}">☎ ${esc(l.name)}</button>`).join('')
+      +'</div>';
+  }
+  document.getElementById('calGrid').innerHTML=html;
+}
+
+/* ---------- Staff calendar ---------- */
+function staffName(id){return id?(staff[+id.slice(1)-1]||''):'';}
+function initials(n){return n?n.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2):'';}
+function fillStaffSelect(){
+  document.getElementById('f-assign').innerHTML='<option value="">📥 All Bookings (unassigned)</option>'+staff.map((n,i)=>`<option value="s${i+1}">${esc(n)}</option>`).join('');
+}
+function renameStaff(i){
+  const n=prompt('Rename staff member',staff[i]);
+  if(n&&n.trim()){staff[i]=n.trim();fillStaffSelect();renderStaff();saveConfig();}
+}
+function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-((x.getDay()+6)%7));return x;}
+let weekStart=mondayOf(new Date());
+function staffShift(n){weekStart.setDate(weekStart.getDate()+7*n);renderStaff();}
+function staffToday(){weekStart=mondayOf(new Date());renderStaff();}
+function renderStaff(){
+  const days=[...Array(7)].map((_,i)=>{const d=new Date(weekStart);d.setDate(d.getDate()+i);return d;});
+  const t=todayStr(),end=days[6];
+  document.getElementById('staffTitle').textContent=days[0].getDate()+' '+MONTHS[days[0].getMonth()].slice(0,3)+' – '+end.getDate()+' '+MONTHS[end.getMonth()].slice(0,3)+' '+end.getFullYear();
+  let html='<div class="scorner">Team</div>'+days.map(d=>{
+    const ds=dToStr(d);
+    return `<div class="sday${ds===t?' today':''}">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]} ${d.getDate()}</div>`;
+  }).join('');
+  const lanes=[{id:'',name:'📥 All Bookings',pool:true},...staff.map((n,i)=>({id:'s'+(i+1),name:n}))];
+  lanes.forEach((ln,li)=>{
+    html+=`<div class="slane${ln.pool?' pool':''}" data-lane="${ln.id}"${ln.pool?'':` onclick="renameStaff(${li-1})" title="Click to rename · drop a job here to hand it over"`}>${esc(ln.name)}${ln.pool?'':' <span class="pen">✎</span>'}</div>`;
+    days.forEach(d=>{
+      const ds=dToStr(d);
+      const jobs=leads.filter(l=>l.jobDate===ds&&(l.assignedTo||'')===ln.id).sort((a,b)=>(a.jobTime||'')<(b.jobTime||'')?-1:1);
+      html+=`<div class="scell${ds===t?' today':''}" data-lane="${ln.id}" data-date="${ds}">`+jobs.map(l=>`<button class="calev" style="background:${stageMap[l.stage].color}" onclick="openModal('${l.id}')" title="${esc(l.name)} — ${esc(l.service)}${l.suburb?', '+esc(l.suburb):''} · tap to reassign or reschedule">${l.jobTime?fmtTime12(l.jobTime)+' ':''}${esc(l.name)}</button>`).join('')+'</div>';
+    });
+  });
+  const grid=document.getElementById('staffGrid');
+  grid.innerHTML=html;
+}
+
+/* ---------- Follow-up templates ---------- */
+let tplEditing=false;
+function fillTplSelect(){document.getElementById('f-tpl').innerHTML=tpls.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('');}
+function tplData(){
+  const first=(document.getElementById('f-name').value.trim().split(/\s+/)[0])||'there';
+  const value=document.getElementById('f-value').value;
+  const jd=document.getElementById('f-jobdate').value,jt=document.getElementById('f-jobtime').value;
+  return{
+    '{name}':first,
+    '{service}':document.getElementById('f-service').value.toLowerCase(),
+    '{value}':value?' ($'+(+value).toLocaleString()+')':'',
+    '{suburb}':document.getElementById('f-suburb').value.trim(),
+    '{address}':document.getElementById('f-address').value.trim(),
+    '{jobwhen}':jd?' for '+fmtD(jd)+(jt?' at '+fmtTime12(jt):''):'',
+  };
+}
+function tplPreview(){
+  if(tplEditing)return;
+  const t=tpls[+document.getElementById('f-tpl').value||0];
+  const map=tplData();
+  document.getElementById('tplText').value=t?t.text.replace(/\{name\}|\{service\}|\{value\}|\{suburb\}|\{address\}|\{jobwhen\}/g,m=>map[m]??m):'';
+}
+function tplSelectChange(){
+  tplEditing=false;
+  document.getElementById('tplEditBtn').textContent='✎ Edit template';
+  document.getElementById('tplText').classList.remove('editing');
+  tplPreview();
+}
+function tplEditToggle(){
+  const ta=document.getElementById('tplText'),btn=document.getElementById('tplEditBtn');
+  const i=+document.getElementById('f-tpl').value||0;
+  if(!tplEditing){tplEditing=true;ta.value=tpls[i].text;btn.textContent='💾 Save template';ta.classList.add('editing');ta.focus();}
+  else{tpls[i].text=ta.value;saveConfig();tplSelectChange();}
+}
+function tplLogUse(how){
+  const id=document.getElementById('f-id').value;
+  if(!id)return;
+  const l=leads.find(x=>x.id===id);
+  if(!l)return;
+  const t=tpls[+document.getElementById('f-tpl').value||0];
+  logAct(l,how+' "'+(t?t.name:'message')+'" template');
+  saveLead(l);renderHist(l);
+}
+function flushBtn(id,msg){const b=document.getElementById(id);const o=b.textContent;b.textContent=msg;setTimeout(()=>b.textContent=o,1400);}
+function tplCopy(){
+  const txt=document.getElementById('tplText').value;
+  const done=()=>{flushBtn('tplCopyBtn','✓ Copied!');tplLogUse('Copied');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done).catch(()=>{const ta=document.getElementById('tplText');ta.select();document.execCommand('copy');done();});}
+  else{const ta=document.getElementById('tplText');ta.select();document.execCommand('copy');done();}
+}
+function tplSms(){
+  const phone=document.getElementById('f-phone').value.replace(/\s+/g,'');
+  location.href='sms:'+phone+'?&body='+encodeURIComponent(document.getElementById('tplText').value);
+  tplLogUse('Texted');
+}
+function tplEmail(){
+  const email=document.getElementById('f-email').value.trim();
+  const t=tpls[+document.getElementById('f-tpl').value||0];
+  location.href='mailto:'+email+'?subject='+encodeURIComponent((t?t.name:'Follow-up')+' — Rapid Oven Cleaning')+'&body='+encodeURIComponent(document.getElementById('tplText').value);
+  tplLogUse('Emailed');
+}
+
+/* ---------- Map ---------- */
+const SUBURBS={
+  'cronulla':[-34.0587,151.1526],'miranda':[-34.0333,151.1000],'caringbah':[-34.0447,151.1229],'sutherland':[-34.0311,151.0576],'engadine':[-34.0651,151.0127],'sylvania':[-34.0104,151.1004],'gymea':[-34.0360,151.0870],'kirrawee':[-34.0333,151.0700],'menai':[-34.0167,151.0333],'jannali':[-34.0186,151.0645],'como':[-34.0000,151.0667],'oyster bay':[-34.0000,151.0833],'bundeena':[-34.0846,151.1508],'kurnell':[-34.0110,151.2100],'woolooware':[-34.0460,151.1420],'taren point':[-34.0170,151.1180],'heathcote':[-34.0850,151.0080],'illawong':[-33.9970,151.0330],
+  'hurstville':[-33.9672,151.1023],'kogarah':[-33.9614,151.1327],'rockdale':[-33.9522,151.1372],'brighton-le-sands':[-33.9600,151.1550],'sans souci':[-33.9910,151.1330],'blakehurst':[-33.9880,151.1110],'penshurst':[-33.9640,151.0890],'mortdale':[-33.9670,151.0790],'oatley':[-33.9800,151.0790],'bexley':[-33.9500,151.1240],'carlton':[-33.9700,151.1210],'ramsgate':[-33.9820,151.1370],'monterey':[-33.9700,151.1450],'beverly hills':[-33.9490,151.0800],
+  'bondi':[-33.8915,151.2767],'bondi junction':[-33.8912,151.2470],'randwick':[-33.9146,151.2437],'coogee':[-33.9205,151.2540],'maroubra':[-33.9500,151.2400],'double bay':[-33.8770,151.2430],'paddington':[-33.8850,151.2260],'woollahra':[-33.8880,151.2410],'vaucluse':[-33.8560,151.2780],'rose bay':[-33.8610,151.2670],'kensington':[-33.9110,151.2220],'mascot':[-33.9260,151.1930],'kingsford':[-33.9240,151.2280],'matraville':[-33.9640,151.2320],
+  'sydney':[-33.8688,151.2093],'surry hills':[-33.8860,151.2110],'newtown':[-33.8960,151.1790],'glebe':[-33.8790,151.1850],'marrickville':[-33.9110,151.1550],'alexandria':[-33.9040,151.1940],'redfern':[-33.8930,151.2040],'balmain':[-33.8580,151.1800],'leichhardt':[-33.8840,151.1570],'ashfield':[-33.8880,151.1250],'burwood':[-33.8770,151.1040],'strathfield':[-33.8790,151.0940],'rozelle':[-33.8620,151.1710],
+  'north sydney':[-33.8390,151.2070],'chatswood':[-33.7960,151.1830],'lane cove':[-33.8140,151.1700],'mosman':[-33.8290,151.2440],'neutral bay':[-33.8320,151.2170],'crows nest':[-33.8260,151.2010],'st leonards':[-33.8230,151.1940],'artarmon':[-33.8090,151.1850],'willoughby':[-33.8030,151.1990],'ryde':[-33.8150,151.1060],'macquarie park':[-33.7770,151.1130],'epping':[-33.7730,151.0820],'eastwood':[-33.7900,151.0810],'gladesville':[-33.8330,151.1290],'hunters hill':[-33.8340,151.1440],
+  'manly':[-33.7970,151.2880],'dee why':[-33.7530,151.2870],'brookvale':[-33.7620,151.2740],'mona vale':[-33.6780,151.3050],'narrabeen':[-33.7130,151.2970],'avalon':[-33.6360,151.3280],'avalon beach':[-33.6360,151.3280],'newport':[-33.6560,151.3210],'frenchs forest':[-33.7500,151.2240],'balgowlah':[-33.7940,151.2570],'freshwater':[-33.7780,151.2860],'collaroy':[-33.7320,151.3010],'terrey hills':[-33.6890,151.2270],
+  'castle hill':[-33.7320,151.0040],'baulkham hills':[-33.7590,150.9930],'kellyville':[-33.7130,150.9580],'rouse hill':[-33.6840,150.9130],'bella vista':[-33.7400,150.9530],'dural':[-33.6870,151.0270],'glenhaven':[-33.7040,151.0060],'winston hills':[-33.7770,150.9770],'north rocks':[-33.7710,151.0210],'cherrybrook':[-33.7230,151.0450],'west pennant hills':[-33.7460,151.0420],'norwest':[-33.7330,150.9660],
+  'parramatta':[-33.8150,151.0010],'blacktown':[-33.7710,150.9060],'penrith':[-33.7510,150.6940],'auburn':[-33.8490,151.0330],'granville':[-33.8330,151.0110],'merrylands':[-33.8370,150.9910],'westmead':[-33.8070,150.9880],'seven hills':[-33.7740,150.9360],'mount druitt':[-33.7660,150.8190],'st marys':[-33.7620,150.7740],'quakers hill':[-33.7260,150.8840],'rooty hill':[-33.7710,150.8440],'doonside':[-33.7630,150.8700],'wentworthville':[-33.8070,150.9720],'toongabbie':[-33.7890,150.9520],
+  'liverpool':[-33.9200,150.9230],'campbelltown':[-34.0650,150.8140],'camden':[-34.0540,150.6960],'bankstown':[-33.9170,151.0330],'fairfield':[-33.8730,150.9560],'cabramatta':[-33.8940,150.9350],'ingleburn':[-33.9980,150.8650],'glenfield':[-33.9700,150.8890],'casula':[-33.9490,150.9060],'moorebank':[-33.9420,150.9440],'prestons':[-33.9410,150.8720],'leppington':[-33.9670,150.8090],'oran park':[-34.0010,150.7420],'narellan':[-34.0440,150.7370],'picton':[-34.1690,150.6120],
+  'gosford':[-33.4270,151.3430],'terrigal':[-33.4480,151.4440],'erina':[-33.4370,151.3910],'woy woy':[-33.4860,151.3230],'wyong':[-33.2840,151.4240],'tuggerah':[-33.3060,151.4190],'the entrance':[-33.3390,151.5000],'bateau bay':[-33.3830,151.4740],'umina beach':[-33.5210,151.3130],'avoca beach':[-33.4650,151.4360],'kariong':[-33.4400,151.2900],'kincumber':[-33.4720,151.4030],
+  'wollongong':[-34.4278,150.8931],'shellharbour':[-34.5780,150.8680],'kiama':[-34.6710,150.8540],'dapto':[-34.5000,150.7900],'corrimal':[-34.3780,150.9040],'thirroul':[-34.3160,150.9210],'figtree':[-34.4360,150.8580],'fairy meadow':[-34.3930,150.8920],'warrawong':[-34.4850,150.8890],'albion park':[-34.5710,150.7770],'helensburgh':[-34.1780,150.9950],'stanwell park':[-34.2270,150.9880],
+};
+let map=null,markerLayer=null,mapFitted=false;
+const hiddenStages=new Set();
+let geoCache=JSON.parse(localStorage.getItem('rapid_crm_geo_v1')||'{}');
+function coordsFor(sub){
+  if(!sub)return null;
+  const k=sub.toLowerCase().trim();
+  return SUBURBS[k]||geoCache[k]||null;
+}
+function initMap(){
+  if(map||typeof L==='undefined')return;
+  map=L.map('map').setView([-33.87,151.05],10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+  markerLayer=L.layerGroup().addTo(map);
+}
+function renderMap(){
+  if(typeof L==='undefined'){
+    document.getElementById('map').innerHTML='<div class="empty">Map couldn\'t load — check your internet connection, then reopen this tab.</div>';
+    renderLegend(0);return;
+  }
+  initMap();
+  setTimeout(()=>map.invalidateSize(),60);
+  markerLayer.clearLayers();
+  const groups={};let unplaced=0;const unknown=[];const pts=[];
+  leads.forEach(l=>{
+    if(hiddenStages.has(l.stage))return;
+    const exact=(l.lat&&l.lng)?[+l.lat,+l.lng]:null;
+    const c=exact||coordsFor(l.suburb);
+    if(!c){
+      unplaced++;
+      if(l.suburb)unknown.push(l);
+      return;
+    }
+    let lat=c[0],lng=c[1];
+    if(!exact){
+      const k=l.suburb.toLowerCase().trim();
+      const n=(groups[k]=(groups[k]||0)+1)-1;
+      lat=c[0]+(n?(n%2?1:-1)*Math.ceil(n/2)*0.0045:0);
+      lng=c[1]+(n?(n%2?-1:1)*Math.ceil(n/2)*0.0045:0);
+    }
+    const st=stageMap[l.stage];
+    const m=L.circleMarker([lat,lng],{radius:9,color:'#fff',weight:2,fillColor:st.color,fillOpacity:.95});
+    m.bindPopup(`<div class="pop-name">${esc(l.name)}</div>`+
+      `<div>${esc(l.service)}${l.value?' · <b style="color:#16a34a">'+money(l.value)+'</b>':''}</div>`+
+      `<div style="color:#6b7280;margin-top:2px">📍 ${placeLink(l)}</div>`+
+      (l.phone?`<div style="color:#6b7280;margin-top:2px">📞 ${telLink(l.phone)}</div>`:'')+
+      `<div style="margin-top:5px"><span class="badge" style="background:${st.color}1a;color:${st.color}">${st.name}</span></div>`+
+      `<button class="pop-open" onclick="openModal('${l.id}')">Open lead</button>`);
+    markerLayer.addLayer(m);
+    pts.push([lat,lng]);
+  });
+  if(pts.length&&!mapFitted){map.fitBounds(pts,{padding:[40,40],maxZoom:13});mapFitted=true;}
+  renderLegend(unplaced);
+  if(unknown.length)geocodeQueue(unknown);
+}
+function renderLegend(unplaced){
+  const el=document.getElementById('mapLegend');
+  el.innerHTML=STAGES.map(s=>{
+    const n=leads.filter(l=>l.stage===s.id).length;
+    return `<span class="lchip ${hiddenStages.has(s.id)?'off':''}" onclick="toggleStage('${s.id}')"><span class="dot" style="background:${s.color}"></span>${s.name} (${n})</span>`;
+  }).join('')+(unplaced?`<span class="mapnote">⚠ ${unplaced} lead${unplaced>1?'s':''} not on map (missing or unrecognised suburb)</span>`:'');
+}
+function toggleStage(id){hiddenStages.has(id)?hiddenStages.delete(id):hiddenStages.add(id);renderMap();}
+let geoBusy=false;
+async function geocodeQueue(list){
+  if(geoBusy)return;geoBusy=true;
+  let found=false;
+  for(const l of list){
+    const k=l.suburb.toLowerCase().trim();
+    if(SUBURBS[k]||k in geoCache)continue;
+    try{
+      const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q='+encodeURIComponent(l.suburb+', NSW, Australia'));
+      const d=await r.json();
+      geoCache[k]=d&&d[0]?[+d[0].lat,+d[0].lon]:0;
+      if(geoCache[k])found=true;
+      localStorage.setItem('rapid_crm_geo_v1',JSON.stringify(geoCache));
+    }catch(e){break;}
+    await new Promise(res=>setTimeout(res,1100));
+  }
+  geoBusy=false;
+  if(found&&document.getElementById('page-map').classList.contains('active'))renderMap();
+}
+
+/* ---------- Export ---------- */
+function exportCSV(){
+  const cols=['name','phone','email','service','suburb','address','value','source','stage','followUp','jobDate','jobTime','assignedTo','notes','createdAt'];
+  const head=['Name','Phone','Email','Service','Suburb','Address','Value','Source','Stage','Follow-up','Job Date','Job Time','Assigned To','Notes','Date Added'];
+  const rows=leads.map(l=>cols.map(c=>{
+    let v=c==='createdAt'?fdate(l[c]):c==='stage'?stageMap[l[c]].name:c==='assignedTo'?staffName(l[c]):(l[c]??'');
+    v=(''+v).replace(/\"/g,'""');
+    return /[\",\\n]/.test(v)?`"${v}"`:v;
+  }).join(','));
+  const csv=[head.join(','),...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='rapid-oven-clients-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+/* ---------- Public API for automated lead intake ---------- */
+function intakeFromHash(){
+  if(location.hash.startsWith('#addlead=')){
+    try{
+      const obj=JSON.parse(decodeURIComponent(location.hash.slice(9)));
+      if(obj&&obj.name){
+        const nl={id:uid(),createdAt:Date.now(),service:'Oven Clean',source:'Website',value:'',suburb:'',address:'',phone:'',email:'',notes:'',history:[],...obj,stage:'new'};
+        logAct(nl,'Lead received automatically — '+nl.source);
+        leads.push(nl);
+        saveLead(nl);
+      }
+    }catch(e){}
+    history.replaceState(null,'',location.pathname);
+  }
+}
+
+/* ---------- Zapier lead feed (Google Sheet polling) ---------- */
+const FEED_KEY='rapid_crm_feed_v1';
+let feedCfg=JSON.parse(localStorage.getItem(FEED_KEY)||'null');
+let feedTimer=null;
+function saveFeedCfg(){localStorage.setItem(FEED_KEY,JSON.stringify(feedCfg));}
+function extractSheetId(input){
+  const m=input.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return m?m[1]:input.trim();
+}
+function sheetQueryUrl(id){
+  return 'https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:json&headers=1';
+}
+async function fetchSheet(id){
+  const r=await fetch(sheetQueryUrl(id));
+  if(!r.ok)throw new Error('HTTP '+r.status+' — check the sheet ID');
+  const text=await r.text();
+  const m=text.match(/setResponse\(([\s\S]*)\);?\s*$/);
+  if(!m)throw new Error('Sheet isn\'t publicly readable — share it as "Anyone with the link — Viewer"');
+  return JSON.parse(m[1]);
+}
+function rowsToLeadObjs(json,fromIndex){
+  const cols=json.table.cols.map(c=>(c.label||'').trim().toLowerCase());
+  const idx=name=>cols.indexOf(name);
+  const iName=idx('name'),iPhone=idx('phone'),iEmail=idx('email'),iService=idx('service'),
+        iSuburb=idx('suburb'),iAddress=idx('address'),iValue=idx('value'),iSource=idx('source'),iNotes=idx('notes');
+  const cell=(r,i)=>(i>=0&&r.c[i]&&r.c[i].v!=null)?String(r.c[i].v).trim():'';
+  return json.table.rows.slice(fromIndex).map(r=>({
+    name:cell(r,iName),phone:cell(r,iPhone),email:cell(r,iEmail),
+    service:cell(r,iService)||'Oven Clean',suburb:cell(r,iSuburb),address:cell(r,iAddress),
+    value:cell(r,iValue),source:cell(r,iSource)||'Zapier',notes:cell(r,iNotes)
+  })).filter(l=>l.name);
+}
+async function pollFeed(silent){
+  if(!feedCfg||!feedCfg.sheetId)return 0;
+  try{
+    const json=await fetchSheet(feedCfg.sheetId);
+    const totalRows=json.table.rows.length;
+    const newOnes=rowsToLeadObjs(json,feedCfg.lastRow||0);
+    newOnes.forEach(obj=>{
+      const nl={id:uid(),createdAt:Date.now(),value:'',suburb:'',address:'',phone:'',email:'',notes:'',history:[],...obj,stage:'new'};
+      logAct(nl,'Lead received automatically — '+nl.source);
+      leads.push(nl);
+      saveLead(nl);
+    });
+    feedCfg.lastRow=totalRows;feedCfg.lastSync=Date.now();feedCfg.lastError=null;
+    saveFeedCfg();
+    if(newOnes.length)refreshActive();
+    setFeedDot(true);
+    return newOnes.length;
+  }catch(e){
+    feedCfg.lastError=e.message;saveFeedCfg();
+    setFeedDot(false);
+    if(!silent)throw e;
+    return 0;
+  }
+}
+function setFeedDot(ok){
+  const dot=document.getElementById('feedDot');
+  if(!dot)return;
+  dot.textContent=(!feedCfg||!feedCfg.sheetId)?'⚪':(ok?'🟢':'🔴');
+}
+function startFeedPolling(){
+  clearInterval(feedTimer);
+  if(!feedCfg||!feedCfg.sheetId)return;
+  feedTimer=setInterval(()=>pollFeed(true),45000);
+}
+async function connectFeed(){
+  const raw=document.getElementById('feedSheetInput').value.trim();
+  const status=document.getElementById('feedStatus');
+  if(!raw){status.textContent='Paste a sheet URL or ID first.';status.style.color='var(--red)';return;}
+  const id=extractSheetId(raw);
+  status.textContent='Connecting…';status.style.color='var(--muted)';
+  try{
+    const json=await fetchSheet(id);
+    feedCfg={sheetId:id,lastRow:json.table.rows.length,lastSync:Date.now(),lastError:null};
+    saveFeedCfg();
+    status.textContent='Connected — '+json.table.rows.length+' existing row(s) skipped. New leads will flow in from here.';
+    status.style.color='var(--green)';
+    setFeedDot(true);
+    startFeedPolling();
+  }catch(e){
+    status.textContent='Couldn\'t read that sheet: '+e.message;
+    status.style.color='var(--red)';
+    setFeedDot(false);
+  }
+}
+async function importFeedNow(){
+  const raw=document.getElementById('feedSheetInput').value.trim();
+  const status=document.getElementById('feedStatus');
+  const id=raw?extractSheetId(raw):(feedCfg&&feedCfg.sheetId);
+  if(!id){status.textContent='Paste a sheet URL or ID first.';status.style.color='var(--red)';return;}
+  status.textContent='Importing…';status.style.color='var(--muted)';
+  try{
+    feedCfg={sheetId:id,lastRow:0,lastSync:Date.now(),lastError:null};
+    saveFeedCfg();
+    const added=await pollFeed(false);
+    status.textContent='Imported '+added+' lead(s) from the sheet. Live sync is now on.';
+    status.style.color='var(--green)';
+    document.getElementById('feedSheetInput').value=id;
+    startFeedPolling();
+  }catch(e){
+    status.textContent='Import failed: '+e.message;
+    status.style.color='var(--red)';
+  }
+}
+function disconnectFeed(){
+  feedCfg=null;
+  localStorage.removeItem(FEED_KEY);
+  clearInterval(feedTimer);
+  document.getElementById('feedStatus').textContent='Disconnected.';
+  document.getElementById('feedStatus').style.color='var(--muted)';
+  document.getElementById('feedSheetInput').value='';
+  setFeedDot(true);
+}
+function openFeedModal(){
+  document.getElementById('overlay3').classList.add('open');
+  const status=document.getElementById('feedStatus');
+  if(feedCfg&&feedCfg.sheetId){
+    document.getElementById('feedSheetInput').value=feedCfg.sheetId;
+    if(feedCfg.lastError){status.textContent='Last sync failed: '+feedCfg.lastError;status.style.color='var(--red)';}
+    else{status.textContent='Connected'+(feedCfg.lastSync?' · last synced '+ago(feedCfg.lastSync):'')+'.';status.style.color='var(--green)';}
+  }else{
+    status.textContent='Not connected yet.';
+    status.style.color='var(--muted)';
+  }
+}
+function closeFeedModal(){document.getElementById('overlay3').classList.remove('open');}
+
+/* ---------- Init ---------- */
+init();
+intakeFromHash();
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+document.getElementById('overlay2').addEventListener('click',e=>{if(e.target.id==='overlay2')closeProject();});
+document.getElementById('todoText').addEventListener('keydown',e=>{if(e.key==='Enter')addTodo();});
+document.addEventListener('click',e=>{if(!e.target.closest('#addrSug')&&e.target.id!=='f-address')hideSug();});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  const s=document.getElementById('addrSug');
+  if(s&&!s.classList.contains('hide')){hideSug();return;}
+  if(document.getElementById('overlay2').classList.contains('open')){closeProject();return;}
+  closeModal();
+});
+</script>
+</body>
+</html>
