@@ -808,6 +808,22 @@ function placeLink(l,stop){
   return`<a class=\"tel\" draggable=\"false\" href=\"${mapsLink(l)}\" target=\"_blank\" rel=\"noopener\" title=\"Open in Google Maps\"${stop?' onclick=\"event.stopPropagation()\"':''}>${esc(txt)}</a>`;
 }
 
+/* ---------- Stat jumps ---------- */
+function jumpStage(id){
+  showPage('pipeline');
+  setTimeout(()=>{
+    const col=document.querySelector(`.col[data-stage="${id}"]`);
+    if(col)col.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+  },50);
+}
+function jumpDue(){
+  showPage('pipeline');
+  setTimeout(()=>{
+    const board=document.getElementById('board');
+    if(board)board.scrollIntoView({behavior:'smooth'});
+  },50);
+}
+
 /* ---------- Stats ---------- */
 function renderStats(){
   const monthAgo=Date.now()-30*86400000;
@@ -821,10 +837,10 @@ function renderStats(){
   const t=todayStr();
   const due=leads.filter(l=>l.followUp&&l.followUp<=t&&!['won','lost'].includes(l.stage)).length;
   document.getElementById('stats').innerHTML=`
-    <div class="stat accent" onclick="showPage('pipeline')"><div class="k">New Leads</div><div class="v">${nNew}</div></div>
-    <div class="stat" onclick="showPage('pipeline')"><div class="k">Follow-ups Due</div><div class="v" style="${due?'color:var(--red)':''}">${due}</div></div>
-    <div class="stat" onclick="showPage('clients')"><div class="k">In Progress</div><div class="v">${active}</div></div>
-    <div class="stat" onclick="showPage('clients')"><div class="k">Pipeline Value</div><div class="v">${money(pipeValue)||'$0'}</div></div>
+    <div class="stat accent" onclick="jumpStage('new')"><div class="k">New Leads</div><div class="v">${nNew}</div></div>
+    <div class="stat" onclick="jumpDue()"><div class="k">Follow-ups Due</div><div class="v" style="${due?'color:var(--red)':''}">${due}</div></div>
+    <div class="stat" onclick="jumpStage('contacted')"><div class="k">In Progress</div><div class="v">${active}</div></div>
+    <div class="stat" onclick="jumpStage('followup')"><div class="k">Pipeline Value</div><div class="v">${money(pipeValue)||'$0'}</div></div>
     <div class="stat"><div class="k">Won (revenue)</div><div class="v" style="color:var(--green)">${money(revenue)||'$0'}</div></div>
     <div class="stat"><div class="k">Win Rate</div><div class="v">${conv}<small>%</small></div></div>`;
 }
