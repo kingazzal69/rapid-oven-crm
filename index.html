@@ -716,7 +716,7 @@ async function saveLeads(){
     return upsertRow('leads',id,data);
   }));
 }
-async function saveLead(l){
+async function syncLead(l){
   const {id,...data}=l;
   await upsertRow('leads',id,data);
 }
@@ -821,7 +821,7 @@ function renderStats(){
 function moveLeadTo(id,stageId){
   const s=STAGES.find(x=>x.id===stageId);
   const lead=leads.find(x=>x.id===id);
-  if(lead&&s&&lead.stage!==s.id){logAct(lead,'Moved to '+s.name);lead.stage=s.id;saveLead(lead);renderBoard();}
+  if(lead&&s&&lead.stage!==s.id){logAct(lead,'Moved to '+s.name);lead.stage=s.id;syncLead(lead);renderBoard();}
 }
 function moveProjectTo(id,statusId){
   const s=PSTAGES.find(x=>x.id===statusId);
@@ -996,7 +996,7 @@ async function saveLead(){
     Object.assign(l,data);
     if(addrPick){l.lat=addrPick.lat;l.lng=addrPick.lng;}
     else if(addrChanged){delete l.lat;delete l.lng;}
-    await saveLead(l);
+    await syncLead(l);
   }else{
     const nl={id:uid(),createdAt:Date.now(),history:[],...data};
     if(addrPick){nl.lat=addrPick.lat;nl.lng=addrPick.lng;}
@@ -1005,7 +1005,7 @@ async function saveLead(){
     if(data.jobDate)logAct(nl,'Job booked for '+fmtD(data.jobDate)+(data.jobTime?' at '+fmtTime12(data.jobTime):''));
     if(data.assignedTo)logAct(nl,'Assigned to '+staffName(data.assignedTo));
     leads.push(nl);
-    await saveLead(nl);
+    await syncLead(nl);
   }
   closeModal();refreshActive();
 }
@@ -1300,7 +1300,7 @@ function tplLogUse(how){
   if(!l)return;
   const t=tpls[+document.getElementById('f-tpl').value||0];
   logAct(l,how+' "'+(t?t.name:'message')+'" template');
-  saveLead(l);renderHist(l);
+  syncLead(l);renderHist(l);
 }
 function flushBtn(id,msg){const b=document.getElementById(id);const o=b.textContent;b.textContent=msg;setTimeout(()=>b.textContent=o,1400);}
 function tplCopy(){
@@ -1443,7 +1443,7 @@ function intakeFromHash(){
         const nl={id:uid(),createdAt:Date.now(),service:'Oven Clean',source:'Website',value:'',suburb:'',address:'',phone:'',email:'',notes:'',history:[],...obj,stage:'new'};
         logAct(nl,'Lead received automatically — '+nl.source);
         leads.push(nl);
-        saveLead(nl);
+        syncLead(nl);
       }
     }catch(e){}
     history.replaceState(null,'',location.pathname);
@@ -1492,7 +1492,7 @@ async function pollFeed(silent){
       const nl={id:uid(),createdAt:Date.now(),value:'',suburb:'',address:'',phone:'',email:'',notes:'',history:[],...obj,stage:'new'};
       logAct(nl,'Lead received automatically — '+nl.source);
       leads.push(nl);
-      saveLead(nl);
+      syncLead(nl);
     });
     feedCfg.lastRow=totalRows;feedCfg.lastSync=Date.now();feedCfg.lastError=null;
     saveFeedCfg();
