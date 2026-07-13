@@ -876,7 +876,7 @@ function cardEl(l){
   const d=document.createElement('div');
   d.className='card';d.style.borderLeftColor=stageMap[l.stage].color;
   d.innerHTML=`
-    <div class="cn"><span>${esc(l.name)}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
+    <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
     <div class="meta">
       ${(l.address||l.suburb)?`<span>📍 ${placeLink(l,true)}</span>`:''}
       ${l.phone?`<span>📞 ${telLink(l.phone,true)}</span>`:''}
