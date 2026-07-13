@@ -610,15 +610,24 @@ async function init(){
       if(!o.history)o.history=[];
       return o;
     });
-    if(!leads.length)leads=seed();
+    if(!leads.length){
+      leads=seed();
+      for(const l of leads)await syncLead(l);
+    }
     // Load projects
     const pra=await fetchAll('projects');
     projects=pra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
-    if(!projects.length)projects=seedProjects();
+    if(!projects.length){
+      projects=seedProjects();
+      for(const p of projects)await saveProject(p);
+    }
     // Load todos
     const tra=await fetchAll('todos');
     todos=tra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
-    if(!todos.length)todos=seedTodos();
+    if(!todos.length){
+      todos=seedTodos();
+      await saveTodos();
+    }
     // Load config
     const cfg=await fetchAll('config');
     const cfgData=cfg[0]&&cfg[0].data||{};
