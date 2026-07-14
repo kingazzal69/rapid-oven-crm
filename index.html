@@ -934,19 +934,25 @@ function renderTable(){
       <td>${money(l.value)||'—'}</td>
       <td>${esc(l.source)}</td>
       <td><span class="badge" style="background:${st.color}1a;color:${st.color}">${st.name}</span></td>
-      <td style="white-space:nowrap">${fuCell(l)}</td>
+      <td style="white-space:nowrap">${fuCellSelect(l)}</td>
       <td style="color:var(--muted);white-space:nowrap">${fdate(l.createdAt)}</td>
     </tr>`;
   }).join('');
   document.getElementById('tableEmpty').classList.toggle('hide',rows.length>0);
 }
 function rowOpen(e,id){if(e.target.closest('a,button'))return;openModal(id);}
-function fuCell(l){
-  if(!l.followUp)return'<span style="color:var(--muted)">—</span>';
-  const t=todayStr(),closed=['won','lost'].includes(l.stage);
-  const c=closed?'var(--muted)':l.followUp<t?'var(--red)':l.followUp===t?'var(--amber)':'inherit';
-  const w=(!closed&&l.followUp<=t)?'700':'500';
-  return`<span style="color:${c};font-weight:${w}">${fmtD(l.followUp)}${!closed&&l.followUp<t?' ⚠':''}</span>`;
+function fuCellSelect(l){
+  const t=todayStr();
+  const closed=['won','lost'].includes(l.stage);
+  if(closed)return l.followUp?`<span style="color:var(--muted)">${fmtD(l.followUp)}</span>`:'<span style="color:var(--muted)">—</span>';
+  const opts=['','Today','Tomorrow','+3 days','+1 week','+2 weeks','+1 month'].map((label,i)=>{
+    const d=new Date();d.setDate(d.getDate()+i);
+    const val=i===0?'':dToStr(d);
+    const sel=l.followUp===val?' selected':'';
+    return `<option value="${val}"${sel}>${label}</option>`;
+  }).join('');
+  return `<select class="stagesel" onchange="event.stopPropagation();l.followUp=this.value;syncLead(l);renderTable()" onclick="event.stopPropagation()" style="max-width:100px">
+    ${opts}</select>`;
 }
 
 /* ---------- Modal ---------- */
