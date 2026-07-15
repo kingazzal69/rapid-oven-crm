@@ -403,10 +403,29 @@
 
 <!-- ================= SQUARE REPORT ================= -->
 <section id="page-square" class="page">
+  <div class="stats" id="squareStats"></div>
   <div class="wrap">
-    <h2 style="font-size:19px;font-weight:800;margin-bottom:14px">Square Report</h2>
-    <div id="squareContent">
-      <div class="empty">Square integration coming soon.</div>
+    <div class="toolbar">
+      <h2 style="font-size:19px;font-weight:800">Square — Staff Sales &amp; Cash</h2>
+      <div style="flex:1"></div>
+      <span style="font-size:12px;color:var(--muted)" id="squareUpdated"></span>
+    </div>
+    <div class="tablewrap">
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Staff</th>
+            <th>Total Sales</th>
+            <th>Card</th>
+            <th>Cash on Hand</th>
+            <th>Tips</th>
+            <th>Commission (35%)</th>
+            <th>Payments</th>
+          </tr></thead>
+          <tbody id="squareBody"></tbody>
+        </table>
+      </div>
+      <div id="squareEmpty" class="empty hide">No Square sales data yet — check back after the sync runs.</div>
     </div>
   </div>
 </section>
@@ -693,6 +712,9 @@ function startRealtime(){
     if(!loading)fillStaffSelect();
     if(!loading)fillTplSelect();
   });});
+  subscribe('staff_earnings',()=>{debounceSync('staff_earnings',async()=>{
+    if(!loading&&document.getElementById('page-square').classList.contains('active'))renderSquare();
+  });});
 }
 const syncQueue={};
 function debounceSync(key,fn){
@@ -790,13 +812,14 @@ function showPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   ['pipeline','clients','calendar','staff','map','projects','todo','square'].forEach(x=>document.getElementById('nav-'+x).classList.toggle('active',x===p));
-  if(p==='clients')renderTable();else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else renderBoard();
+  if(p==='clients')renderTable();else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else if(p==='square')renderSquare();else renderBoard();
 }
 function refreshActive(){
   if(document.getElementById('page-clients').classList.contains('active'))renderTable();
   else if(document.getElementById('page-map').classList.contains('active'))renderMap();
   else if(document.getElementById('page-calendar').classList.contains('active'))renderCal();
   else if(document.getElementById('page-staff').classList.contains('active'))renderStaff();
+  else if(document.getElementById('page-square').classList.contains('active'))renderSquare();
   else renderBoard();
 }
 
@@ -1251,6 +1274,60 @@ function renderTodos(){
 function renderTodoBadge(){
   const n=todos.filter(x=>!x.done).length;
   document.getElementById('nav-todo').textContent=n?`To-Do (${n})`:'To-Do';
+}
+
+/* ---------- Square (staff sales / cash / commission) ---------- */
+async function renderSquare(){
+  const statsEl=document.getElementById('squareStats');
+  const body=document.getElementById('squareBody');
+  const emptyEl=document.getElementById('squareEmpty');
+  const updEl=document.getElementById('squareUpdated');
+  let rows=[];
+  try{
+    const {data,error}=await _sb.from('staff_earnings').select('*').order('total_sales',{ascending:false});
+    if(error)throw error;
+    rows=data||[];
+  }catch(e){
+    console.warn('Square fetch failed:',e);
+    statsEl.innerHTML='';statsEl.style.gridTemplateColumns='';
+    body.innerHTML='';
+    emptyEl.textContent='Could not load Square data — try again shortly.';
+    emptyEl.classList.remove('hide');
+    updEl.textContent='';
+    return;
+  }
+  if(!rows.length){
+    statsEl.innerHTML='';statsEl.style.gridTemplateColumns='';
+    body.innerHTML='';
+    emptyEl.textContent='No Square sales data yet — check back after the sync runs.';
+    emptyEl.classList.remove('hide');
+    updEl.textContent='';
+    return;
+  }
+  emptyEl.classList.add('hide');
+  const staffRows=rows.filter(r=>r.id!=='sqstaff_UNASSIGNED');
+  const unassigned=rows.find(r=>r.id==='sqstaff_UNASSIGNED');
+  const totalSales=rows.reduce((a,r)=>a+(+r.total_sales||0),0);
+  const totalCash=rows.reduce((a,r)=>a+(+r.cash_on_hand||0),0);
+  const totalComm=staffRows.reduce((a,r)=>a+(+r.commission_owed||0),0);
+  statsEl.style.gridTemplateColumns='repeat(4,1fr)';
+  statsEl.innerHTML=`
+    <div class="stat accent"><div class="k">Total Sales (this week)</div><div class="v">${money(totalSales)||'$0'}</div></div>
+    <div class="stat"><div class="k">Cash On Hand</div><div class="v">${money(totalCash)||'$0'}</div></div>
+    <div class="stat"><div class="k">Staff Commission Owed</div><div class="v" style="color:var(--green)">${money(totalComm)||'$0'}</div></div>
+    <div class="stat"><div class="k">Unattributed Sales</div><div class="v"${unassigned&&unassigned.total_sales?' style="color:var(--amber)"':''}>${money(unassigned&&unassigned.total_sales)||'$0'}</div></div>`;
+  body.innerHTML=staffRows.map(r=>`
+    <tr>
+      <td class="name-cell">${esc(r.staff_name||'—')}</td>
+      <td>${money(r.total_sales)||'$0'}</td>
+      <td style="color:var(--muted)">${money(r.card_sales)||'—'}</td>
+      <td>${r.cash_on_hand?`<span class="badge" style="background:#fef3c7;color:var(--amber)">${money(r.cash_on_hand)}</span>`:'<span style="color:var(--muted)">$0</span>'}</td>
+      <td style="color:var(--muted)">${money(r.tips)||'—'}</td>
+      <td style="color:var(--green);font-weight:700">${money(r.commission_owed)||'$0'}</td>
+      <td style="color:var(--muted)">${r.payment_count||0}</td>
+    </tr>`).join('');
+  const latest=rows.reduce((a,r)=>Math.max(a,new Date(r.updated_at).getTime()||0),0);
+  updEl.textContent=latest?('Updated '+ago(latest)+' · syncs every 5 min'):'';
 }
 
 /* ---------- Calendar ---------- */
