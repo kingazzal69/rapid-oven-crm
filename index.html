@@ -882,7 +882,6 @@ function cardEl(l){
     <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a>`:''}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
     <div class="meta">
       ${(l.address||l.suburb)?`<span>📍 ${placeLink(l,true)}</span>`:''}
-      ${l.phone?`<span>📞 ${telLink(l.phone,true)}</span>`:''}
     </div>
     <div class="chips">
       <span class="chip svc">${esc(l.service)}</span>
