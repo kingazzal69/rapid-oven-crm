@@ -283,6 +283,7 @@
     <button id="nav-map" onclick="showPage('map')">Map</button>
     <button id="nav-projects" onclick="showPage('projects')">Projects</button>
     <button id="nav-todo" onclick="showPage('todo')">To-Do</button>
+    <button id="nav-square" onclick="showPage('square')">Square</button>
   </nav>
   <div class="spacer"></div>
   <button class="hbtn ghost" onclick="openFeedModal()" title="Connect your Zapier lead feed" aria-label="Lead feed"><span class="ic" id="feedDot">⚪</span><span class="lbl">Lead Feed</span></button>
@@ -397,6 +398,16 @@
       <button class="hbtn" onclick="addTodo()">+ Add</button>
     </div>
     <div id="todoList"></div>
+  </div>
+</section>
+
+<!-- ================= SQUARE REPORT ================= -->
+<section id="page-square" class="page">
+  <div class="wrap">
+    <h2 style="font-size:19px;font-weight:800;margin-bottom:14px">Square Report</h2>
+    <div id="squareContent">
+      <div class="empty">Square integration coming soon.</div>
+    </div>
   </div>
 </section>
 
@@ -778,7 +789,7 @@ async function saveConfig(){
 function showPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  ['pipeline','clients','calendar','staff','map','projects','todo'].forEach(x=>document.getElementById('nav-'+x).classList.toggle('active',x===p));
+  ['pipeline','clients','calendar','staff','map','projects','todo','square'].forEach(x=>document.getElementById('nav-'+x).classList.toggle('active',x===p));
   if(p==='clients')renderTable();else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else renderBoard();
 }
 function refreshActive(){
