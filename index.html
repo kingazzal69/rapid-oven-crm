@@ -61,7 +61,10 @@
   .wrap{padding:18px 22px 40px}
   .board{display:flex;gap:14px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
   .col{background:#ebedf0;border-radius:14px;width:280px;min-width:280px;flex-shrink:0;display:flex;flex-direction:column;max-height:calc(100vh - 220px)}
-  .col-head{padding:13px 14px 10px;display:flex;align-items:center;gap:8px;position:sticky;top:0}
+  .col-head{padding:13px 14px 10px;display:flex;align-items:center;gap:8px;position:sticky;top:0;cursor:pointer;user-select:none}
+  .col-head .chev{font-size:10px;color:var(--muted);transition:transform .15s;flex-shrink:0}
+  .col.collapsed .chev{transform:rotate(-90deg)}
+  .col.collapsed .col-body{display:none}
   .dot{width:9px;height:9px;border-radius:50%}
   .col-head .t{font-weight:800;font-size:13px;letter-spacing:.3px}
   .col-head .c{margin-left:auto;background:#fff;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:700;padding:1px 9px;border-radius:20px}
@@ -592,6 +595,7 @@ const STAGES = [
   {id:'won',      name:'Closed — Won',color:'#16a34a'},
   {id:'lost',     name:'Closed — Lost',color:'#9aa0aa'},
 ];
+let collapsedStages=new Set(JSON.parse(localStorage.getItem('collapsedStages')||'[]'));
 const stageMap = Object.fromEntries(STAGES.map(s=>[s.id,s]));
 
 /* ---------- Data ---------- */
@@ -850,7 +854,10 @@ function jumpStage(id){
   showPage('pipeline');
   setTimeout(()=>{
     const col=document.querySelector(`.col[data-stage="${id}"]`);
-    if(col)col.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+    if(col){
+      if(col.classList.contains('collapsed'))toggleCol(id);
+      col.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+    }
   },50);
 }
 function jumpDue(){
@@ -902,12 +909,17 @@ function renderBoard(){
   STAGES.forEach(s=>{
     const items=leads.filter(l=>l.stage===s.id).sort((a,b)=>b.createdAt-a.createdAt);
     const col=document.createElement('div');
-    col.className='col';col.dataset.stage=s.id;
-    col.innerHTML=`<div class="col-head"><span class="dot" style="background:${s.color}"></span><span class="t">${s.name}</span><span class="c">${items.length}</span></div><div class="col-body"></div>`;
+    col.className='col'+(collapsedStages.has(s.id)?' collapsed':'');col.dataset.stage=s.id;
+    col.innerHTML=`<div class="col-head" onclick="toggleCol('${s.id}')"><span class="chev">▾</span><span class="dot" style="background:${s.color}"></span><span class="t">${s.name}</span><span class="c">${items.length}</span></div><div class="col-body"></div>`;
     const body=col.querySelector('.col-body');
     items.forEach(l=>body.appendChild(cardEl(l)));
     board.appendChild(col);
   });
+}
+function toggleCol(id){
+  collapsedStages.has(id)?collapsedStages.delete(id):collapsedStages.add(id);
+  localStorage.setItem('collapsedStages',JSON.stringify([...collapsedStages]));
+  document.querySelector(`.col[data-stage="${id}"]`)?.classList.toggle('collapsed');
 }
 function cardEl(l){
   const d=document.createElement('div');
