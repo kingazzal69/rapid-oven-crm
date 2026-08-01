@@ -335,6 +335,7 @@
         <span style="color:var(--muted);font-size:13px">–</span>
         <input type="date" class="filter" id="fTo" onchange="renderTable()" title="Added to">
       </div>
+      <span id="archiveNote" class="hide" style="color:var(--muted);font-size:13px;font-weight:600"></span>
     </div>
     <div class="tablewrap">
       <div class="table-scroll">
@@ -641,6 +642,43 @@ async function fetchAll(table){
   if(error)throw error;
   return data||[];
 }
+/* Supabase caps a single select at 1000 rows — page through so large tables load fully. */
+async function fetchPaged(table,build){
+  const PAGE=1000;let out=[],from=0;
+  for(;;){
+    let q=_sb.from(table).select('*').order('updated_at',{ascending:false}).range(from,from+PAGE-1);
+    if(build)q=build(q);
+    const {data,error}=await q;
+    if(error)throw error;
+    out=out.concat(data||[]);
+    if(!data||data.length<PAGE)break;
+    from+=PAGE;
+  }
+  return out;
+}
+/* Live pipeline leads only (archived ServiceM8 history is loaded lazily for the Clients tab). */
+const notArchived=q=>q.or('data->archived.is.null,data->archived.not.eq.true');
+let archivedLoaded=false,archivedLoading=false;
+async function fetchActiveLeadRows(){return fetchPaged('leads',notArchived);}
+async function fetchArchivedLeadRows(){return fetchPaged('leads',q=>q.filter('data->archived','eq','true'));}
+function rowsToLeads(rows){return rows.map(r=>{const o=r.data||{};o.id=r.id;if(!o.history)o.history=[];return o;});}
+async function ensureArchivedLoaded(){
+  if(archivedLoaded||archivedLoading)return;
+  archivedLoading=true;
+  const el=document.getElementById('archiveNote');
+  if(el){el.textContent='Loading full client history…';el.classList.remove('hide');}
+  try{
+    const rows=await fetchArchivedLeadRows();
+    const have=new Set(leads.map(l=>l.id));
+    leads=leads.concat(rowsToLeads(rows).filter(l=>!have.has(l.id)));
+    archivedLoaded=true;
+    if(el)el.classList.add('hide');
+    renderTable();
+  }catch(e){
+    console.warn('Archived history load failed:',e);
+    if(el)el.textContent='Couldn\'t load full history — showing recent clients only.';
+  }finally{archivedLoading=false;}
+}
 async function upsertRow(table,id,data){
   const {error}=await _sb.from(table).upsert({id,data,updated_at:new Date().toISOString()},{onConflict:'id'});
   if(error)throw error;
@@ -662,14 +700,8 @@ function subscribe(table,cb){
 /* ---------- Load all data ---------- */
 async function init(){
   try{
-    // Load leads
-    const raw=await fetchAll('leads');
-    leads=raw.map(r=>{
-      const o=r.data||{};
-      o.id=r.id;
-      if(!o.history)o.history=[];
-      return o;
-    });
+    // Load leads (live pipeline only — archived history loads on demand)
+    leads=rowsToLeads(await fetchActiveLeadRows());
     if(!leads.length){
       leads=seed();
       for(const l of leads)await syncLead(l);
@@ -712,8 +744,9 @@ async function init(){
 let syncTimer=null;
 function startRealtime(){
   subscribe('leads',()=>{debounceSync('leads',async()=>{
-    const raw=await fetchAll('leads');
-    leads=raw.map(r=>{const o=r.data||{};o.id=r.id;if(!o.history)o.history=[];return o;});
+    const fresh=rowsToLeads(await fetchActiveLeadRows());
+    // keep any archived history already loaded for the Clients tab
+    leads=archivedLoaded?fresh.concat(leads.filter(l=>l.archived)):fresh;
     if(!loading)refreshActive();
     renderTodoBadge();
   });});
@@ -838,7 +871,7 @@ function showPage(p){
   ['pipeline','clients','calendar','staff','map','projects','todo','square'].forEach(x=>document.getElementById('nav-'+x).classList.toggle('active',x===p));
   document.getElementById('navToggleLabel').textContent=document.getElementById('nav-'+p).textContent;
   document.getElementById('nav').classList.remove('open');
-  if(p==='clients')renderTable();else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else if(p==='square')renderSquare();else renderBoard();
+  if(p==='clients'){renderTable();ensureArchivedLoaded();}else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else if(p==='square')renderSquare();else renderBoard();
 }
 function toggleNavMenu(){document.getElementById('nav').classList.toggle('open');}
 document.addEventListener('click',e=>{
