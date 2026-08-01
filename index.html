@@ -42,6 +42,7 @@
   nav button{background:transparent;border:none;color:#c9ccd2;font-size:14px;font-weight:600;padding:9px 16px;border-radius:8px}
   nav button.active{background:rgba(255,255,255,.10);color:#fff}
   nav button:hover{color:#fff}
+  .navToggle{display:none}
   .spacer{flex:1}
   .hbtn{background:var(--orange);color:#fff;border:none;font-weight:700;font-size:14px;padding:10px 16px;border-radius:9px;display:flex;align-items:center;gap:7px;white-space:nowrap;flex-shrink:0}
   .hbtn:hover{background:var(--orange-dark)}
@@ -234,7 +235,11 @@
     .brand{gap:8px}
     .brand .mark,.brand .mark svg{width:26px;height:26px}
     .brand .name{font-size:14px}
-    nav button{padding:9px 12px;font-size:13.5px}
+    .navToggle{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.08);color:#fff;border:none;font-size:13.5px;font-weight:700;padding:9px 12px;border-radius:8px;flex:1;min-width:0}
+    .navToggle span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    nav{display:none;position:absolute;top:56px;left:12px;right:12px;margin-left:0;flex-direction:column;gap:2px;background:var(--ink);border-radius:10px;padding:6px;box-shadow:0 10px 24px rgba(0,0,0,.3);z-index:60;overflow-x:visible;max-height:calc(100vh - 70px);overflow-y:auto}
+    nav.open{display:flex}
+    nav button{padding:12px 14px;font-size:14px;text-align:left;width:100%}
     .hbtn{padding:10px 12px;font-size:13.5px}
     .wrap{padding:14px 12px 30px}
     .stats{padding:14px 12px 4px;gap:10px}
@@ -282,7 +287,11 @@
     </div>
     <div class="name">RAPID<small>OVEN CLEANING · CRM</small></div>
   </div>
-  <nav>
+  <button class="navToggle" id="navToggle" onclick="event.stopPropagation();toggleNavMenu()">
+    <span id="navToggleLabel">Pipeline</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+  <nav id="nav">
     <button id="nav-pipeline" class="active" onclick="showPage('pipeline')">Pipeline</button>
     <button id="nav-clients" onclick="showPage('clients')">Clients Database</button>
     <button id="nav-calendar" onclick="showPage('calendar')">Calendar</button>
@@ -825,8 +834,15 @@ function showPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   ['pipeline','clients','calendar','staff','map','projects','todo','square'].forEach(x=>document.getElementById('nav-'+x).classList.toggle('active',x===p));
+  document.getElementById('navToggleLabel').textContent=document.getElementById('nav-'+p).textContent;
+  document.getElementById('nav').classList.remove('open');
   if(p==='clients')renderTable();else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else if(p==='square')renderSquare();else renderBoard();
 }
+function toggleNavMenu(){document.getElementById('nav').classList.toggle('open');}
+document.addEventListener('click',e=>{
+  const nav=document.getElementById('nav');
+  if(nav.classList.contains('open')&&!nav.contains(e.target)&&e.target.id!=='navToggle')nav.classList.remove('open');
+});
 function refreshActive(){
   if(document.getElementById('page-clients').classList.contains('active'))renderTable();
   else if(document.getElementById('page-map').classList.contains('active'))renderMap();
