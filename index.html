@@ -97,7 +97,9 @@
   .search{flex:1;min-width:200px;position:relative}
   .search input{width:100%;padding:11px 12px 11px 36px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff}
   .search svg{position:absolute;left:11px;top:11px;color:var(--muted)}
-  select.filter{padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff;font-weight:600}
+  select.filter,input.filter{padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff;font-weight:600}
+  .daterange{display:flex;align-items:center;gap:6px}
+  .daterange input.filter{width:140px}
   .tablewrap{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
   .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -250,6 +252,8 @@
     .toolbar{gap:8px}
     .search{min-width:100%}
     select.filter{flex:1;min-width:120px}
+    .daterange{width:100%}
+    .daterange input.filter{flex:1;width:auto;min-width:0}
     /* board becomes single-column scroll-down */
     .board{flex-direction:column;overflow-x:visible;width:100%}
     .col{width:100%;min-width:100%;max-height:none;margin-bottom:12px;box-sizing:border-box}
@@ -317,6 +321,11 @@
         <option value="">All services</option>
         <option>Oven Clean</option><option>BBQ Clean</option><option>Rangehood Clean</option><option>Stovetop Clean</option><option>Full Kitchen</option>
       </select>
+      <div class="daterange">
+        <input type="date" class="filter" id="fFrom" onchange="renderTable()" title="Added from">
+        <span style="color:var(--muted);font-size:13px">–</span>
+        <input type="date" class="filter" id="fTo" onchange="renderTable()" title="Added to">
+      </div>
     </div>
     <div class="tablewrap">
       <div class="table-scroll">
@@ -961,9 +970,12 @@ function renderTable(){
   const q=document.getElementById('search').value.toLowerCase().trim();
   const fs=document.getElementById('fStage').value;
   const fsvc=document.getElementById('fSvc').value;
+  const fFrom=document.getElementById('fFrom').value;
+  const fTo=document.getElementById('fTo').value;
   let rows=leads.filter(l=>{
     if(fs&&l.stage!==fs)return false;
     if(fsvc&&l.service!==fsvc)return false;
+    if(fFrom||fTo){const d=dToStr(l.createdAt);if(fFrom&&d<fFrom)return false;if(fTo&&d>fTo)return false;}
     if(q){const hay=`${l.name} ${l.phone} ${l.email} ${l.suburb} ${l.address||''} ${l.service} ${l.source}`.toLowerCase();if(!hay.includes(q))return false;}
     return true;
   });
