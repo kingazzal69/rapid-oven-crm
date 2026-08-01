@@ -116,6 +116,15 @@
   .rowbtn{background:none;border:1px solid var(--line);border-radius:7px;padding:5px 9px;font-size:12px;font-weight:600;color:var(--muted)}
   .rowbtn:hover{border-color:var(--orange);color:var(--orange)}
   .empty{padding:50px;text-align:center;color:var(--muted)}
+  .pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px}
+  .pager .pinfo{color:var(--muted);font-size:13px;font-weight:600;margin-right:auto}
+  .pager button{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;color:var(--ink-2);min-width:38px}
+  .pager button:hover:not(:disabled){border-color:var(--orange);color:var(--orange)}
+  .pager button.active{background:var(--orange);border-color:var(--orange);color:#fff}
+  .pager button:disabled{opacity:.4;cursor:default}
+  .pager .gap{color:var(--muted);padding:0 2px;font-weight:700}
+  .clientcount{margin-bottom:12px;font-size:14px;color:var(--ink-2);font-weight:600}
+  .clientcount b{color:var(--orange);font-weight:800}
 
   /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
@@ -321,22 +330,23 @@
     <div class="toolbar">
       <div class="search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-        <input id="search" placeholder="Search name, phone, email, suburb…" oninput="renderTable()">
+        <input id="search" placeholder="Search name, phone, email, suburb…" oninput="filterChanged()">
       </div>
-      <select class="filter" id="fStage" onchange="renderTable()">
+      <select class="filter" id="fStage" onchange="filterChanged()">
         <option value="">All stages</option>
       </select>
-      <select class="filter" id="fSvc" onchange="renderTable()">
+      <select class="filter" id="fSvc" onchange="filterChanged()">
         <option value="">All services</option>
         <option>Oven Clean</option><option>BBQ Clean</option><option>Rangehood Clean</option><option>Stovetop Clean</option><option>Full Kitchen</option>
       </select>
       <div class="daterange">
-        <input type="date" class="filter" id="fFrom" onchange="renderTable()" title="Added from">
+        <input type="date" class="filter" id="fFrom" onchange="filterChanged()" title="Added from">
         <span style="color:var(--muted);font-size:13px">–</span>
-        <input type="date" class="filter" id="fTo" onchange="renderTable()" title="Added to">
+        <input type="date" class="filter" id="fTo" onchange="filterChanged()" title="Added to">
       </div>
       <span id="archiveNote" class="hide" style="color:var(--muted);font-size:13px;font-weight:600"></span>
     </div>
+    <div class="clientcount" id="clientCount"></div>
     <div class="tablewrap">
       <div class="table-scroll">
         <table>
@@ -357,6 +367,7 @@
       </div>
       <div id="tableEmpty" class="empty hide">No clients match your search.</div>
     </div>
+    <div class="pager" id="pager"></div>
   </div>
 </section>
 
@@ -1018,7 +1029,10 @@ function toggleSelectAll(){
 
 /* ---------- Table ---------- */
 let sortKey='createdAt',sortDir=-1;
-function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();}
+let clientPage=1;const CLIENTS_PER_PAGE=100;
+function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}clientPage=1;renderTable();}
+function filterChanged(){clientPage=1;renderTable();}
+function goToPage(p){clientPage=p;renderTable();document.querySelector('#page-clients .tablewrap').scrollIntoView({behavior:'smooth',block:'start'});}
 function renderTable(){
   const q=document.getElementById('search').value.toLowerCase().trim();
   const fs=document.getElementById('fStage').value;
@@ -1033,12 +1047,17 @@ function renderTable(){
     return true;
   });
   rows.sort((a,b)=>{let x=a[sortKey]??'',y=b[sortKey]??'';if(sortKey==='value'){x=+x||0;y=+y||0;}if(typeof x==='string'){x=x.toLowerCase();y=(''+y).toLowerCase();}return x<y?-sortDir:x>y?sortDir:0;});
+  const total=rows.length;
+  const pages=Math.max(1,Math.ceil(total/CLIENTS_PER_PAGE));
+  if(clientPage>pages)clientPage=pages;
+  const start=(clientPage-1)*CLIENTS_PER_PAGE;
+  const pageRows=rows.slice(start,start+CLIENTS_PER_PAGE);
   const tb=document.getElementById('tbody');
-  tb.innerHTML=rows.map(l=>{
+  tb.innerHTML=pageRows.map((l,i)=>{
     const st=stageMap[l.stage];
     return `<tr onclick="rowOpen(event,'${l.id}')">
       <td style="width:28px"><input type="checkbox" class="rowCheck" value="${l.id}" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:14px;height:14px;cursor:pointer"></td>
-      <td style="width:28px;color:var(--muted);font-size:12px">${rows.indexOf(l)+1}</td>
+      <td style="width:28px;color:var(--muted);font-size:12px">${start+i+1}</td>
       <td class="name-cell">${esc(l.name)}<small>${telLink(l.phone)}${l.phone&&l.email?' · ':''}${esc(l.email||'')}</small></td>
       <td>${esc(l.service)}</td>
       <td>${esc(l.suburb||'—')}${l.address?`<br><a class="tel" style="font-size:12px;color:var(--muted)" href="${mapsLink(l)}" target="_blank" rel="noopener">${esc(l.address)}</a>`:''}</td>
@@ -1049,7 +1068,34 @@ function renderTable(){
       <td style="color:var(--muted);white-space:nowrap">${fdate(l.createdAt)}</td>
     </tr>`;
   }).join('');
-  document.getElementById('tableEmpty').classList.toggle('hide',rows.length>0);
+  document.getElementById('tableEmpty').classList.toggle('hide',total>0);
+  const filtered=!!(q||fs||fsvc||fFrom||fTo);
+  const totalAll=leads.length;
+  document.getElementById('clientCount').innerHTML=filtered
+    ?`<b>${total.toLocaleString()}</b> ${total===1?'client':'clients'} match <span style="color:var(--muted);font-weight:600">(of ${totalAll.toLocaleString()} total)</span>`
+    :`<b>${total.toLocaleString()}</b> total ${total===1?'client':'clients'}`;
+  renderPager(total,pages,start,pageRows.length);
+}
+function renderPager(total,pages,start,shown){
+  const el=document.getElementById('pager');
+  if(!total){el.innerHTML='';return;}
+  const info=`Showing ${start+1}–${start+shown} of ${total.toLocaleString()}`;
+  if(pages<=1){el.innerHTML=`<span class="pinfo">${info}</span>`;return;}
+  const nav=(p,label)=>`<button${p?'':' disabled'}${p?` onclick="goToPage(${p})"`:''}>${label}</button>`;
+  const num=n=>n===clientPage?`<button class="active">${n}</button>`:`<button onclick="goToPage(${n})">${n}</button>`;
+  // page-number window: 1 … c-2 c-1 [c] c+1 c+2 … last
+  const nums=new Set([1,pages,clientPage,clientPage-1,clientPage+1,clientPage-2,clientPage+2]);
+  const list=[...nums].filter(n=>n>=1&&n<=pages).sort((a,b)=>a-b);
+  let html=`<span class="pinfo">${info}</span>`;
+  html+=nav(clientPage>1?clientPage-1:0,'‹ Prev');
+  let prev=0;
+  for(const n of list){
+    if(prev&&n-prev>1)html+=`<span class="gap">…</span>`;
+    html+=num(n);
+    prev=n;
+  }
+  html+=nav(clientPage<pages?clientPage+1:0,'Next ›');
+  el.innerHTML=html;
 }
 function rowOpen(e,id){if(e.target.closest('a,button'))return;openModal(id);}
 function fuCellSelect(l){
