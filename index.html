@@ -615,6 +615,8 @@ const STAGES = [
 ];
 let collapsedStages=new Set(JSON.parse(localStorage.getItem('collapsedStages')||'[]'));
 const stageMap = Object.fromEntries(STAGES.map(s=>[s.id,s]));
+/* Imported ServiceM8 history is tagged archived:true — kept out of the live Pipeline board, map, and stats; still visible/searchable in the Clients Database table. */
+function activeLeads(){return leads.filter(l=>!l.archived);}
 
 /* ---------- Data ---------- */
 let leads = [];
@@ -895,16 +897,17 @@ function jumpDue(){
 
 /* ---------- Stats ---------- */
 function renderStats(){
+  const al=activeLeads();
   const monthAgo=Date.now()-30*86400000;
-  const nNew=leads.filter(l=>l.stage==='new').length;
-  const active=leads.filter(l=>['contacted','followup','quoted'].includes(l.stage)).length;
-  const wonThisMonth=leads.filter(l=>l.stage==='won'&&l.createdAt>monthAgo);
-  const revenue=leads.filter(l=>l.stage==='won').reduce((a,l)=>a+(+l.value||0),0);
-  const pipeValue=leads.filter(l=>['new','contacted','followup','quoted'].includes(l.stage)).reduce((a,l)=>a+(+l.value||0),0);
-  const closed=leads.filter(l=>['won','lost'].includes(l.stage)).length;
-  const conv=closed?Math.round(leads.filter(l=>l.stage==='won').length/closed*100):0;
+  const nNew=al.filter(l=>l.stage==='new').length;
+  const active=al.filter(l=>['contacted','followup','quoted'].includes(l.stage)).length;
+  const wonThisMonth=al.filter(l=>l.stage==='won'&&l.createdAt>monthAgo);
+  const revenue=al.filter(l=>l.stage==='won').reduce((a,l)=>a+(+l.value||0),0);
+  const pipeValue=al.filter(l=>['new','contacted','followup','quoted'].includes(l.stage)).reduce((a,l)=>a+(+l.value||0),0);
+  const closed=al.filter(l=>['won','lost'].includes(l.stage)).length;
+  const conv=closed?Math.round(al.filter(l=>l.stage==='won').length/closed*100):0;
   const t=todayStr();
-  const due=leads.filter(l=>l.followUp&&l.followUp<=t&&!['won','lost'].includes(l.stage)).length;
+  const due=al.filter(l=>l.followUp&&l.followUp<=t&&!['won','lost'].includes(l.stage)).length;
   document.getElementById('stats').innerHTML=`
     <div class="stat accent" onclick="jumpStage('new')"><div class="k">New Leads</div><div class="v">${nNew}</div></div>
     <div class="stat" onclick="jumpDue()"><div class="k">Follow-ups Due</div><div class="v" style="${due?'color:var(--red)':''}">${due}</div></div>
@@ -931,8 +934,9 @@ function renderBoard(){
   renderStats();
   const board=document.getElementById('board');
   board.innerHTML='';
+  const al=activeLeads();
   STAGES.forEach(s=>{
-    const items=leads.filter(l=>l.stage===s.id).sort((a,b)=>b.createdAt-a.createdAt);
+    const items=al.filter(l=>l.stage===s.id).sort((a,b)=>b.createdAt-a.createdAt);
     const col=document.createElement('div');
     col.className='col'+(collapsedStages.has(s.id)?' collapsed':'');col.dataset.stage=s.id;
     col.innerHTML=`<div class="col-head" onclick="toggleCol('${s.id}')"><span class="chev">▾</span><span class="dot" style="background:${s.color}"></span><span class="t">${s.name}</span><span class="c">${items.length}</span></div><div class="col-body"></div>`;
@@ -1530,7 +1534,7 @@ function renderMap(){
   setTimeout(()=>map.invalidateSize(),60);
   markerLayer.clearLayers();
   const groups={};let unplaced=0;const unknown=[];const pts=[];
-  leads.forEach(l=>{
+  activeLeads().forEach(l=>{
     if(hiddenStages.has(l.stage))return;
     const exact=(l.lat&&l.lng)?[+l.lat,+l.lng]:null;
     const c=exact||coordsFor(l.suburb);
@@ -1564,7 +1568,7 @@ function renderMap(){
 function renderLegend(unplaced){
   const el=document.getElementById('mapLegend');
   el.innerHTML=STAGES.map(s=>{
-    const n=leads.filter(l=>l.stage===s.id).length;
+    const n=activeLeads().filter(l=>l.stage===s.id).length;
     return `<span class="lchip ${hiddenStages.has(s.id)?'off':''}" onclick="toggleStage('${s.id}')"><span class="dot" style="background:${s.color}"></span>${s.name} (${n})</span>`;
   }).join('')+(unplaced?`<span class="mapnote">⚠ ${unplaced} lead${unplaced>1?'s':''} not on map (missing or unrecognised suburb)</span>`:'');
 }
