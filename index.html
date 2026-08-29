@@ -82,6 +82,9 @@
   .card .smsbtn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#eef2ff;color:#4f46e5;font-size:12px;margin-left:4px;vertical-align:middle;flex-shrink:0;border:none;cursor:pointer;line-height:1;padding:0}
   .card .smsbtn:hover{background:#dbe2ff}
   .card .smsbtn:active{transform:scale(.92)}
+  .card .advbtn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e8f7ee;color:#15803d;font-size:15px;font-weight:800;flex-shrink:0;border:none;cursor:pointer;line-height:1;padding:0}
+  .card .advbtn:hover{background:#d3f0dd}
+  .card .advbtn:active{transform:scale(.92)}
   .card .meta{font-size:12px;color:var(--muted);margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 10px}
   .card .meta span{display:inline-flex;align-items:center;gap:4px}
   .tel{color:inherit;text-decoration:none;border-bottom:1px dotted #b9bec7}
@@ -970,6 +973,13 @@ function moveLeadTo(id,stageId){
   const lead=leads.find(x=>x.id===id);
   if(lead&&s&&lead.stage!==s.id){logAct(lead,'Moved to '+s.name);lead.stage=s.id;syncLead(lead);renderBoard();}
 }
+function advanceStage(id){
+  const lead=leads.find(x=>x.id===id);
+  if(!lead)return;
+  const idx=STAGES.findIndex(s=>s.id===lead.stage);
+  if(idx<0||idx>=STAGES.length-2)return; // already Won/Lost — nothing "next" makes sense
+  moveLeadTo(id,STAGES[idx+1].id);
+}
 function moveProjectTo(id,statusId){
   const s=PSTAGES.find(x=>x.id===statusId);
   const p=projects.find(x=>x.id===id);
@@ -1000,8 +1010,10 @@ function toggleCol(id){
 function cardEl(l){
   const d=document.createElement('div');
   d.className='card';d.style.borderLeftColor=stageMap[l.stage].color;
+  const sIdx=STAGES.findIndex(s=>s.id===l.stage);
+  const nextStage=(sIdx>=0&&sIdx<STAGES.length-2)?STAGES[sIdx+1]:null;
   d.innerHTML=`
-    <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a><button class="smsbtn" onclick="event.stopPropagation();quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written">💬</button>`:''}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
+    <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a><button class="smsbtn" onclick="event.stopPropagation();quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written">💬</button>`:''}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}${nextStage?`<button class="advbtn" onclick="event.stopPropagation();advanceStage('${l.id}')" title="Move to ${esc(nextStage.name)}">→</button>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
     <div class="meta">
       ${(l.address||l.suburb)?`<span>📍 ${placeLink(l,true)}</span>`:''}
     </div>
