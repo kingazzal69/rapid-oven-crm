@@ -104,6 +104,7 @@
   .search{flex:1;min-width:200px;position:relative}
   .search input{width:100%;padding:11px 12px 11px 36px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff}
   .search svg{position:absolute;left:11px;top:11px;color:var(--muted)}
+  .board-search{max-width:420px;margin-bottom:14px}
   select.filter,input.filter{padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff;font-weight:600}
   .daterange{display:flex;align-items:center;gap:6px}
   .daterange input.filter{width:140px}
@@ -326,6 +327,12 @@
 <section id="page-pipeline" class="page active">
   <div class="stats" id="stats"></div>
   <div class="wrap">
+    <div class="board-search">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input id="boardSearch" placeholder="Search leads by name, phone, email, suburb…" oninput="renderBoard()">
+      </div>
+    </div>
     <div class="board" id="board"></div>
   </div>
 </section>
@@ -991,7 +998,9 @@ function renderBoard(){
   renderStats();
   const board=document.getElementById('board');
   board.innerHTML='';
-  const al=activeLeads();
+  const q=(document.getElementById('boardSearch')?.value||'').toLowerCase().trim();
+  let al=activeLeads();
+  if(q)al=al.filter(l=>`${l.name} ${l.phone||''} ${l.email||''} ${l.suburb||''} ${l.address||''} ${l.service||''}`.toLowerCase().includes(q));
   STAGES.forEach(s=>{
     const items=al.filter(l=>l.stage===s.id).sort((a,b)=>b.createdAt-a.createdAt);
     const col=document.createElement('div');
