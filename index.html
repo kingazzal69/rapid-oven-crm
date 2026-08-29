@@ -79,6 +79,9 @@
   .stagesel{border:1px solid var(--line);border-radius:8px;padding:4px 5px;font-size:11px;font-weight:700;background:#fff;color:var(--ink);cursor:pointer;max-width:112px}
   .stagesel:hover,.stagesel:focus{border-color:var(--orange)}
   .card .val{color:var(--green);font-weight:800;font-size:13px;white-space:nowrap}
+  .card .smsbtn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#eef2ff;color:#4f46e5;font-size:12px;margin-left:4px;vertical-align:middle;flex-shrink:0;border:none;cursor:pointer;line-height:1;padding:0}
+  .card .smsbtn:hover{background:#dbe2ff}
+  .card .smsbtn:active{transform:scale(.92)}
   .card .meta{font-size:12px;color:var(--muted);margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 10px}
   .card .meta span{display:inline-flex;align-items:center;gap:4px}
   .tel{color:inherit;text-decoration:none;border-bottom:1px dotted #b9bec7}
@@ -998,7 +1001,7 @@ function cardEl(l){
   const d=document.createElement('div');
   d.className='card';d.style.borderLeftColor=stageMap[l.stage].color;
   d.innerHTML=`
-    <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a>`:''}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
+    <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a><button class="smsbtn" onclick="event.stopPropagation();quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written">💬</button>`:''}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
     <div class="meta">
       ${(l.address||l.suburb)?`<span>📍 ${placeLink(l,true)}</span>`:''}
     </div>
@@ -1568,6 +1571,36 @@ function tplSms(){
   const phone=document.getElementById('f-phone').value.replace(/\s+/g,'');
   location.href='sms:'+phone+'?&body='+encodeURIComponent(document.getElementById('tplText').value);
   tplLogUse('Texted');
+}
+/* ---------- Quick SMS (straight from a Pipeline card) ---------- */
+function pickTplForStage(stage){
+  if(stage==='quoted')return 1;   // Quote follow-up
+  if(stage==='followup')return 2; // Missed call
+  if(stage==='won')return 3;      // Booking confirmation
+  return 0;                       // New enquiry reply (new/contacted/lost/default)
+}
+function tplTextForLead(l,i){
+  const t=tpls[i]||tpls[0];
+  if(!t)return'';
+  const first=(l.name||'').trim().split(/\s+/)[0]||'there';
+  const map={
+    '{name}':first,
+    '{service}':(l.service||'').toLowerCase(),
+    '{value}':l.value?' ($'+(+l.value).toLocaleString()+')':'',
+    '{suburb}':l.suburb||'',
+    '{address}':l.address||'',
+    '{jobwhen}':l.jobDate?' for '+fmtD(l.jobDate)+(l.jobTime?' at '+fmtTime12(l.jobTime):''):'',
+  };
+  return t.text.replace(/\{name\}|\{service\}|\{value\}|\{suburb\}|\{address\}|\{jobwhen\}/g,m=>map[m]??m);
+}
+function quickSms(id){
+  const l=leads.find(x=>x.id===id);
+  if(!l||!l.phone)return;
+  const i=pickTplForStage(l.stage);
+  const text=tplTextForLead(l,i);
+  location.href='sms:'+l.phone.replace(/\s+/g,'')+'?&body='+encodeURIComponent(text);
+  logAct(l,'Texted "'+(tpls[i]?tpls[i].name:'message')+'" template (quick)');
+  syncLead(l);
 }
 function tplEmail(){
   const email=document.getElementById('f-email').value.trim();
