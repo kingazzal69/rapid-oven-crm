@@ -651,7 +651,7 @@ let staff = ['Staff 1','Staff 2','Staff 3','Staff 4'];
 let tpls = [
   {name:'New enquiry reply',text:'Hi {name}\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you\'d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks,\nRapid Oven Cleaning'},
   {name:'Quote follow-up',text:'Hi {name}, just checking in on the quote we sent for your {service}{value}. Happy to answer any questions or book in a time that suits you. — Rapid Oven Cleaning'},
-  {name:'Missed call',text:'Hi {name}, we tried calling about your {service} enquiry but couldn\'t reach you. Reply here or give us a buzz on 0457 978 972 whenever suits. — Rapid Oven Cleaning'},
+  {name:'Follow-up',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Just following up as you wanted us to get back in touch with you.\n\nIf you’d still like a quote, all I need to know is whether you have a standard oven, wide oven or BBQ.\n\nThanks, \nRapid Oven Cleaning'},
   {name:'Booking confirmation',text:'Hi {name}, confirming your {service}{jobwhen}. We\'ll see you then — if anything changes just let us know on 0457 978 972. — Rapid Oven Cleaning'},
   {name:'Review request',text:'Hi {name}, thanks for having Rapid Oven Cleaning out for your {service}! If you were happy with the result, a quick Google review would mean the world to us. Cheers!'},
 ];
@@ -1606,7 +1606,7 @@ function firstNameOf(name){
 }
 function pickTplForStage(stage){
   if(stage==='quoted')return 1;   // Quote follow-up
-  if(stage==='followup')return 2; // Missed call
+  if(stage==='followup')return 2; // Follow-up
   if(stage==='won')return 3;      // Booking confirmation
   return 0;                       // New enquiry reply (new/contacted/lost/default)
 }
