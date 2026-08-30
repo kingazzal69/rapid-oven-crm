@@ -1542,7 +1542,7 @@ function renderStaff(){
 let tplEditing=false;
 function fillTplSelect(){document.getElementById('f-tpl').innerHTML=tpls.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('');}
 function tplData(){
-  const first=(document.getElementById('f-name').value.trim().split(/\s+/)[0])||'there';
+  const first=firstNameOf(document.getElementById('f-name').value);
   const value=document.getElementById('f-value').value;
   const jd=document.getElementById('f-jobdate').value,jt=document.getElementById('f-jobtime').value;
   return{
@@ -1594,6 +1594,16 @@ function tplSms(){
   tplLogUse('Texted');
 }
 /* ---------- Quick SMS (straight from a Pipeline card) ---------- */
+/* Names come in two shapes: "First Last" (manual/seed leads) and "Last, First" (ServiceM8 sync) — pick the actual first name either way. */
+function firstNameOf(name){
+  name=(name||'').trim();
+  if(!name)return'there';
+  if(name.includes(',')){
+    const after=(name.split(',')[1]||'').trim().split(/\s+/)[0];
+    if(after)return after;
+  }
+  return name.split(/\s+/)[0]||'there';
+}
 function pickTplForStage(stage){
   if(stage==='quoted')return 1;   // Quote follow-up
   if(stage==='followup')return 2; // Missed call
@@ -1603,7 +1613,7 @@ function pickTplForStage(stage){
 function tplTextForLead(l,i){
   const t=tpls[i]||tpls[0];
   if(!t)return'';
-  const first=(l.name||'').trim().split(/\s+/)[0]||'there';
+  const first=firstNameOf(l.name);
   const map={
     '{name}':first,
     '{service}':(l.service||'').toLowerCase(),
