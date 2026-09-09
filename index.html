@@ -98,6 +98,10 @@
   .chip.due.over{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
   .chip.job{background:#e8f7ee;color:#15803d;border:1px solid #bbe7cc}
   .card .age{font-size:11px;color:#9aa0aa;margin-top:8px}
+  .card textarea.cardnotes{display:block;width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;font:inherit;font-size:12px;color:#5b6472;margin-top:8px;padding:4px 6px;border-radius:6px;resize:vertical;line-height:1.4}
+  .card textarea.cardnotes:hover{background:#f7f8fa}
+  .card textarea.cardnotes:focus{outline:none;border-color:var(--orange);background:#fff;box-shadow:0 0 0 3px rgba(242,106,33,.12)}
+  .card textarea.cardnotes::placeholder{color:#b9bec7}
 
   /* Clients table */
   .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
@@ -1032,10 +1036,23 @@ function cardEl(l){
       ${fuChip(l)}
       ${l.jobDate?`<span class="chip job">📅 ${fmtD(l.jobDate)}${l.jobTime?' '+fmtTime12(l.jobTime):''}</span>`:''}
     </div>
-    ${l.notes?`<div class="age" style="color:#5b6472;margin-top:8px">📝 ${esc(l.notes).slice(0,70)}${l.notes.length>70?'…':''}</div>`:''}
+    <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
     <div class="age">Added ${ago(l.createdAt)}</div>`;
   d.addEventListener('click',()=>openModal(l.id));
   return d;
+}
+function notesRows(notes){
+  const lines=(notes||'').split('\n');
+  const n=lines.reduce((a,line)=>a+Math.max(1,Math.ceil(line.length/38)),0);
+  return Math.min(6,Math.max(1,n));
+}
+function cardNotesSave(id,val){
+  const lead=leads.find(x=>x.id===id);
+  if(!lead)return;
+  const v=val.trim();
+  if((lead.notes||'')===v)return;
+  lead.notes=v;
+  syncLead(lead);
 }
 function fuChip(l){
   if(!l.followUp||['won','lost'].includes(l.stage))return'';
