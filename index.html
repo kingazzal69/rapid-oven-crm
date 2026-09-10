@@ -637,11 +637,16 @@ const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 const STAGES = [
   {id:'new',      name:'New Leads',  color:'#F26A21'},
   {id:'contacted',name:'Contacted',  color:'#2563eb'},
+  {id:'deadlead', name:'Lost Lead',  color:'#dc2626'},
   {id:'followup', name:'Follow Up',  color:'#d97706'},
   {id:'quoted',   name:'Quoted',     color:'#7c3aed'},
   {id:'won',      name:'Closed — Won',color:'#16a34a'},
   {id:'lost',     name:'Closed — Lost',color:'#9aa0aa'},
 ];
+/* Stages a lead is done with — excluded from follow-up/in-progress logic and from the "advance →" arrow, but not from win-rate's closed denominator (see renderStats). */
+const TERMINAL_STAGES=['won','lost','deadlead'];
+/* The "advance →" happy path on Pipeline cards — deliberately skips the terminal stages, which are only reached via the stage dropdown. */
+const STAGE_FLOW=['new','contacted','followup','quoted','won'];
 let collapsedStages=new Set(JSON.parse(localStorage.getItem('collapsedStages')||'[]'));
 const stageMap = Object.fromEntries(STAGES.map(s=>[s.id,s]));
 /* Imported ServiceM8 history is tagged archived:true — kept out of the live Pipeline board, map, and stats; still visible/searchable in the Clients Database table. */
@@ -965,10 +970,10 @@ function renderStats(){
   const wonThisMonth=al.filter(l=>l.stage==='won'&&l.createdAt>monthAgo);
   const revenue=al.filter(l=>l.stage==='won').reduce((a,l)=>a+(+l.value||0),0);
   const pipeValue=al.filter(l=>['new','contacted','followup','quoted'].includes(l.stage)).reduce((a,l)=>a+(+l.value||0),0);
-  const closed=al.filter(l=>['won','lost'].includes(l.stage)).length;
+  const closed=al.filter(l=>TERMINAL_STAGES.includes(l.stage)).length;
   const conv=closed?Math.round(al.filter(l=>l.stage==='won').length/closed*100):0;
   const t=todayStr();
-  const due=al.filter(l=>l.followUp&&l.followUp<=t&&!['won','lost'].includes(l.stage)).length;
+  const due=al.filter(l=>l.followUp&&l.followUp<=t&&!TERMINAL_STAGES.includes(l.stage)).length;
   document.getElementById('stats').innerHTML=`
     <div class="stat accent" onclick="jumpStage('new')"><div class="k">New Leads</div><div class="v">${nNew}</div></div>
     <div class="stat" onclick="jumpDue()"><div class="k">Follow-ups Due</div><div class="v" style="${due?'color:var(--red)':''}">${due}</div></div>
@@ -987,9 +992,9 @@ function moveLeadTo(id,stageId){
 function advanceStage(id){
   const lead=leads.find(x=>x.id===id);
   if(!lead)return;
-  const idx=STAGES.findIndex(s=>s.id===lead.stage);
-  if(idx<0||idx>=STAGES.length-2)return; // already Won/Lost — nothing "next" makes sense
-  moveLeadTo(id,STAGES[idx+1].id);
+  const idx=STAGE_FLOW.indexOf(lead.stage);
+  if(idx<0||idx>=STAGE_FLOW.length-1)return; // already Won, or on a terminal stage outside the happy path — nothing "next" makes sense
+  moveLeadTo(id,STAGE_FLOW[idx+1]);
 }
 function moveProjectTo(id,statusId){
   const s=PSTAGES.find(x=>x.id===statusId);
@@ -1023,8 +1028,8 @@ function toggleCol(id){
 function cardEl(l){
   const d=document.createElement('div');
   d.className='card';d.style.borderLeftColor=stageMap[l.stage].color;
-  const sIdx=STAGES.findIndex(s=>s.id===l.stage);
-  const nextStage=(sIdx>=0&&sIdx<STAGES.length-2)?STAGES[sIdx+1]:null;
+  const flowIdx=STAGE_FLOW.indexOf(l.stage);
+  const nextStage=(flowIdx>=0&&flowIdx<STAGE_FLOW.length-1)?stageMap[STAGE_FLOW[flowIdx+1]]:null;
   d.innerHTML=`
     <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a><button class="smsbtn" onclick="event.stopPropagation();quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written">💬</button>`:''}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}${nextStage?`<button class="advbtn" onclick="event.stopPropagation();advanceStage('${l.id}')" title="Move to ${esc(nextStage.name)}">→</button>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
     <div class="meta">
@@ -1055,7 +1060,7 @@ function cardNotesSave(id,val){
   syncLead(lead);
 }
 function fuChip(l){
-  if(!l.followUp||['won','lost'].includes(l.stage))return'';
+  if(!l.followUp||TERMINAL_STAGES.includes(l.stage))return'';
   const t=todayStr();
   if(l.followUp<t)return`<span class="chip due over">⚠ Overdue ${fmtD(l.followUp)}</span>`;
   if(l.followUp===t)return`<span class="chip due today">☎ Follow up today</span>`;
@@ -1141,7 +1146,7 @@ function renderPager(total,pages,start,shown){
 function rowOpen(e,id){if(e.target.closest('a,button'))return;openModal(id);}
 function fuCellSelect(l){
   const t=todayStr();
-  const closed=['won','lost'].includes(l.stage);
+  const closed=TERMINAL_STAGES.includes(l.stage);
   if(closed)return l.followUp?`<span style="color:var(--muted)">${fmtD(l.followUp)}</span>`:'<span style="color:var(--muted)">—</span>';
   const opts=['','Today','Tomorrow','+3 days','+1 week','+2 weeks','+1 month'].map((label,i)=>{
     const d=new Date();d.setDate(d.getDate()+i);
@@ -1511,7 +1516,7 @@ function renderCal(){
     if(day<1||day>dim){html+='<div class="calcell out"></div>';continue;}
     const ds=calY+'-'+String(calM+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
     const jobs=leads.filter(l=>l.jobDate===ds).sort((a,b)=>(a.jobTime||'')<(b.jobTime||'')?-1:1);
-    const fus=leads.filter(l=>l.followUp===ds&&!['won','lost'].includes(l.stage));
+    const fus=leads.filter(l=>l.followUp===ds&&!TERMINAL_STAGES.includes(l.stage));
     html+=`<div class="calcell${ds===t?' today':''}"><span class="dnum">${day}</span>`
       +jobs.map(l=>`<button class="calev" style="background:${stageMap[l.stage].color}" onclick="openModal('${l.id}')" title="${esc(l.name)} — ${esc(l.service)}${l.suburb?', '+esc(l.suburb):''}${l.assignedTo?' · '+esc(staffName(l.assignedTo)):''}">${l.jobTime?fmtTime12(l.jobTime)+' ':''}${esc(l.name)}${l.assignedTo?' · '+esc(initials(staffName(l.assignedTo))):''}</button>`).join('')
       +fus.map(l=>`<button class="calev fu" onclick="openModal('${l.id}')" title="Follow up ${esc(l.name)}">☎ ${esc(l.name)}</button>`).join('')
