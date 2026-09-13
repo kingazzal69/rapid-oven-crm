@@ -19,8 +19,9 @@ Single-file CRM (`index.html`) for Rapid Oven Cleaning (Sydney oven/BBQ cleaning
 
 ## Pipeline / leads data model
 
-- A lead is `{id, name, phone, email, service, source, stage, value, suburb, address, notes, createdAt, followUp, jobDate, jobTime, assignedTo, history[], archived?}`.
-- `stage` is one of: `new`, `contacted`, `followup`, `quoted`, `won`, `lost` (see `STAGES` array in `index.html`).
+- A lead is `{id, name, phone, email, service, source, stage, value, suburb, address, notes, createdAt, followUp, jobDate, jobTime, assignedTo, history[], archived?, messaged?}`.
+- `stage` is one of: `new`, `contacted`, `deadlead`, `followup`, `quoted`, `won`, `lost` (see `STAGES` array in `index.html`). `won`/`lost`/`deadlead` are terminal (see `TERMINAL_STAGES`) and excluded from the pipeline's happy-path advance arrow (see `STAGE_FLOW`) — `deadlead` ("Lost Lead") is for leads that went cold after contact, distinct from `lost` ("Closed — Lost") which is for quotes that didn't convert.
+- `messaged` is a plain boolean toggled by the "msg" checkbox on each Pipeline card — lets Aaron manually tick off who he's texted, independent of stage.
 - **`archived: true`** marks a lead as historical/reference-only (currently: ~11.7k rows bulk-imported from ServiceM8's full job history, dated 2020–2026). Archived leads are deliberately excluded from the live Pipeline board, stat tiles, and Map (see `activeLeads()` helper) — they only show up in the Clients Database table (lazy-loaded on that tab) and CSV export. **Keep this separation if you touch board/stats/map rendering** — Aaron was very explicit that historical bulk data must never pollute the live working pipeline.
 - Names sync in from ServiceM8 as `"Last, First"` (e.g. `"Bowman, Trudy"`), while manual/seed leads are `"First Last"`. Use the `firstNameOf()` helper (handles both) rather than a naive `split(' ')[0]` anywhere you need a first name — this was a real bug (SMS templates were greeting people by surname).
 
