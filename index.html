@@ -81,6 +81,7 @@
   .card .val{color:var(--green);font-weight:800;font-size:13px;white-space:nowrap}
   .card .msgchk{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--muted);cursor:pointer;user-select:none;flex-shrink:0}
   .card .msgchk input{accent-color:var(--orange);width:14px;height:14px;cursor:pointer;margin:0}
+  .card .trackrow{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
   .card .smsbtn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#eef2ff;color:#4f46e5;font-size:12px;margin-left:4px;vertical-align:middle;flex-shrink:0;border:none;cursor:pointer;line-height:1;padding:0}
   .card .smsbtn:hover{background:#dbe2ff}
   .card .smsbtn:active{transform:scale(.92)}
@@ -1033,7 +1034,7 @@ function cardEl(l){
   const flowIdx=STAGE_FLOW.indexOf(l.stage);
   const nextStage=(flowIdx>=0&&flowIdx<STAGE_FLOW.length-1)?stageMap[STAGE_FLOW[flowIdx+1]]:null;
   d.innerHTML=`
-    <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a><button class="smsbtn" onclick="event.stopPropagation();quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written">💬</button>`:''}</span><span class="cn-r"><label class="msgchk" onclick="event.stopPropagation()" title="Tick once you've messaged them"><input type="checkbox" ${l.messaged?'checked':''} onchange="toggleMessaged('${l.id}',this.checked)">msg</label>${l.value?`<span class="val">${money(l.value)}</span>`:''}${nextStage?`<button class="advbtn" onclick="event.stopPropagation();advanceStage('${l.id}')" title="Move to ${esc(nextStage.name)}">→</button>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
+    <div class="cn"><span><input type="checkbox" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:16px;height:16px;margin:0 4px 0 0;flex-shrink:0;cursor:pointer" title="Mark done">${esc(l.name)}${l.phone?` <a href="tel:${l.phone.replace(/[^\d+]/g,'')}" onclick="event.stopPropagation()" style="color:var(--muted);font-weight:500;text-decoration:none;font-size:13px;border-bottom:1px dotted #b9bec7;white-space:nowrap" title="Call ${esc(l.phone)}">${esc(l.phone)}</a><button class="smsbtn" onclick="event.stopPropagation();quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written">💬</button>`:''}</span><span class="cn-r">${l.value?`<span class="val">${money(l.value)}</span>`:''}${nextStage?`<button class="advbtn" onclick="event.stopPropagation();advanceStage('${l.id}')" title="Move to ${esc(nextStage.name)}">→</button>`:''}<select class="stagesel" title="Move to another stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select></span></div>
     <div class="meta">
       ${(l.address||l.suburb)?`<span>📍 ${placeLink(l,true)}</span>`:''}
     </div>
@@ -1044,7 +1045,13 @@ function cardEl(l){
       ${l.jobDate?`<span class="chip job">📅 ${fmtD(l.jobDate)}${l.jobTime?' '+fmtTime12(l.jobTime):''}</span>`:''}
     </div>
     <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
-    <div class="age">Added ${ago(l.createdAt)}</div>`;
+    <div class="age">Added ${ago(l.createdAt)}</div>
+    <div class="trackrow" onclick="event.stopPropagation()">
+      <label class="msgchk" title="Tick once you've messaged them"><input type="checkbox" ${l.messaged?'checked':''} onchange="toggleFlag('${l.id}','messaged',this.checked)">msg</label>
+      <label class="msgchk" title="Day 1 follow-up done"><input type="checkbox" ${l.d1?'checked':''} onchange="toggleFlag('${l.id}','d1',this.checked)">D1</label>
+      <label class="msgchk" title="Day 2 follow-up done"><input type="checkbox" ${l.d2?'checked':''} onchange="toggleFlag('${l.id}','d2',this.checked)">D2</label>
+      <label class="msgchk" title="Day 3 follow-up done"><input type="checkbox" ${l.d3?'checked':''} onchange="toggleFlag('${l.id}','d3',this.checked)">D3</label>
+    </div>`;
   d.addEventListener('click',()=>openModal(l.id));
   return d;
 }
@@ -1061,10 +1068,10 @@ function cardNotesSave(id,val){
   lead.notes=v;
   syncLead(lead);
 }
-function toggleMessaged(id,val){
+function toggleFlag(id,field,val){
   const lead=leads.find(x=>x.id===id);
   if(!lead)return;
-  lead.messaged=val;
+  lead[field]=val;
   syncLead(lead);
 }
 function fuChip(l){
