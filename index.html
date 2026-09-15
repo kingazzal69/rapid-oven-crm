@@ -1498,7 +1498,7 @@ function renderTodoBadge(){
 }
 
 /* ---------- Job Count (ServiceM8 dispatch-board bookings, next 3 weeks) ---------- */
-function mondayOf(dateStr){
+function jcMondayOf(dateStr){
   const d=new Date(dateStr+'T00:00:00');
   const shift=(d.getDay()+6)%7; // Mon=0..Sun=6
   d.setDate(d.getDate()-shift);
@@ -1548,7 +1548,7 @@ async function renderJobCount(){
     <div class="stat"><div class="k">${gap>0?'Gap vs Target':'Over Target'}</div><div class="v" style="color:${gap>0?'var(--red)':'var(--green)'}">${Math.abs(gap)}${gap>0?`<small> · ~${avgNeeded}/day</small>`:''}</div></div>`;
   const weekMap=new Map();
   for(const r of rows){
-    const wk=mondayOf(r.date);
+    const wk=jcMondayOf(r.date);
     if(!weekMap.has(wk))weekMap.set(wk,{dates:[],quotes:0,work_orders:0,total:0});
     const w=weekMap.get(wk);
     w.dates.push(r.date);
