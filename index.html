@@ -474,6 +474,7 @@
             <th>Quotes</th>
             <th>Work Orders</th>
             <th>Total</th>
+            <th>Needed/Day to Hit Target</th>
           </tr></thead>
           <tbody id="jcWeekBody"></tbody>
         </table>
@@ -1560,14 +1561,21 @@ async function renderJobCount(){
     w.total+=+r.total||0;
   }
   const weeks=Array.from(weekMap.keys()).sort().map(wk=>weekMap.get(wk)).slice(0,3);
+  const today=todayStr();
   weekBody.innerHTML=weeks.map((w,i)=>{
     const range=w.dates.length>1?`${fmtD(w.dates[0])} – ${fmtD(w.dates[w.dates.length-1])}`:fmtD(w.dates[0]);
     const label=i===0?'This week':i===1?'Next week':`Week of ${fmtD(w.dates[0])}`;
+    const remainingDays=w.dates.filter(d=>d>=today).length;
+    const weekGap=jobTarget-w.total;
+    const neededCell=weekGap>0&&remainingDays>0
+      ?`<span style="color:var(--red)">${(weekGap/remainingDays).toFixed(1)}/day</span>`
+      :`<span style="color:var(--green)">On track</span>`;
     return `<tr>
       <td class="name-cell">${label}<br><small style="color:var(--muted)">${range}</small></td>
       <td>${w.quotes}</td>
       <td>${w.work_orders}</td>
       <td style="font-weight:700">${w.total}</td>
+      <td>${neededCell}</td>
     </tr>`;
   }).join('');
   const t=todayStr();
