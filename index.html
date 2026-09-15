@@ -465,6 +465,21 @@
       <input id="jcTarget" type="number" min="1" class="filter" style="width:90px" onchange="saveJobTarget(this.value)">
       <span style="font-size:12px;color:var(--muted)" id="jcUpdated"></span>
     </div>
+    <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:4px 0 6px">Weekly Totals</div>
+    <div class="tablewrap" id="jcWeekWrap">
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Week</th>
+            <th>Quotes</th>
+            <th>Work Orders</th>
+            <th>Total</th>
+          </tr></thead>
+          <tbody id="jcWeekBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:20px 0 6px">Daily Breakdown</div>
     <div class="tablewrap">
       <div class="table-scroll">
         <table>
@@ -1483,9 +1498,16 @@ function renderTodoBadge(){
 }
 
 /* ---------- Job Count (ServiceM8 dispatch-board bookings, next 3 weeks) ---------- */
+function mondayOf(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  const shift=(d.getDay()+6)%7; // Mon=0..Sun=6
+  d.setDate(d.getDate()-shift);
+  return dToStr(d.getTime());
+}
 async function renderJobCount(){
   const statsEl=document.getElementById('jcStats');
   const body=document.getElementById('jcBody');
+  const weekBody=document.getElementById('jcWeekBody');
   const emptyEl=document.getElementById('jcEmpty');
   const updEl=document.getElementById('jcUpdated');
   document.getElementById('jcTarget').value=jobTarget;
@@ -1497,14 +1519,14 @@ async function renderJobCount(){
     rows=data||[];
   }catch(e){
     console.warn('Job Count fetch failed:',e);
-    statsEl.innerHTML='';body.innerHTML='';
+    statsEl.innerHTML='';body.innerHTML='';weekBody.innerHTML='';
     emptyEl.textContent='Could not load job count data — try again shortly.';
     emptyEl.classList.remove('hide');
     updEl.textContent='';
     return;
   }
   if(!rows.length){
-    statsEl.innerHTML='';body.innerHTML='';
+    statsEl.innerHTML='';body.innerHTML='';weekBody.innerHTML='';
     emptyEl.textContent='No job count data yet — check back after the sync runs.';
     emptyEl.classList.remove('hide');
     updEl.textContent='';
@@ -1524,6 +1546,27 @@ async function renderJobCount(){
     <div class="stat"><div class="k">Work Orders</div><div class="v">${totalWO}</div></div>
     <div class="stat"><div class="k">Target (${days}d, ${jobTarget}/wk)</div><div class="v">${target}</div></div>
     <div class="stat"><div class="k">${gap>0?'Gap vs Target':'Over Target'}</div><div class="v" style="color:${gap>0?'var(--red)':'var(--green)'}">${Math.abs(gap)}${gap>0?`<small> · ~${avgNeeded}/day</small>`:''}</div></div>`;
+  const weekMap=new Map();
+  for(const r of rows){
+    const wk=mondayOf(r.date);
+    if(!weekMap.has(wk))weekMap.set(wk,{dates:[],quotes:0,work_orders:0,total:0});
+    const w=weekMap.get(wk);
+    w.dates.push(r.date);
+    w.quotes+=+r.quotes||0;
+    w.work_orders+=+r.work_orders||0;
+    w.total+=+r.total||0;
+  }
+  const weeks=Array.from(weekMap.keys()).sort().map(wk=>weekMap.get(wk)).slice(0,3);
+  weekBody.innerHTML=weeks.map((w,i)=>{
+    const range=w.dates.length>1?`${fmtD(w.dates[0])} – ${fmtD(w.dates[w.dates.length-1])}`:fmtD(w.dates[0]);
+    const label=i===0?'This week':i===1?'Next week':`Week of ${fmtD(w.dates[0])}`;
+    return `<tr>
+      <td class="name-cell">${label}<br><small style="color:var(--muted)">${range}</small></td>
+      <td>${w.quotes}</td>
+      <td>${w.work_orders}</td>
+      <td style="font-weight:700">${w.total}</td>
+    </tr>`;
+  }).join('');
   const t=todayStr();
   body.innerHTML=rows.map(r=>`
     <tr${r.date===t?' style="background:#fdf7f3"':''}>
