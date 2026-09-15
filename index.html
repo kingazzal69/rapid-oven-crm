@@ -645,6 +645,7 @@ let tpls = [
   {name:'Booking confirmation',text:'Hi {name}, confirming your {service}{jobwhen}. We\'ll see you then — if anything changes just let us know on 0457 978 972. — Rapid Oven Cleaning'},
   {name:'Review request',text:'Hi {name}, thanks for having Rapid Oven Cleaning out for your {service}! If you were happy with the result, a quick Google review would mean the world to us. Cheers!'},
   {name:'Lost Lead',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
+  {name:'Closed — Lost',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
 ];
 let loading = true;
 
@@ -1578,7 +1579,8 @@ function pickTplForStage(stage){
   if(stage==='followup')return 2; // Follow-up
   if(stage==='won')return 3;      // Booking confirmation
   if(stage==='deadlead')return 5; // Lost Lead
-  return 0;                       // New enquiry reply (new/contacted/lost/default)
+  if(stage==='lost')return 6;     // Closed — Lost
+  return 0;                       // New enquiry reply (new/contacted/default)
 }
 function tplTextForLead(l,i){
   const t=tpls[i]||tpls[0];
