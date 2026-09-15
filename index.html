@@ -1047,7 +1047,6 @@ function cardEl(l){
     <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
     <div class="age">Added ${ago(l.createdAt)}</div>
     <div class="trackrow" onclick="event.stopPropagation()">
-      <label class="msgchk" title="Tick once you've messaged them"><input type="checkbox" ${l.messaged?'checked':''} onchange="toggleFlag('${l.id}','messaged',this.checked)">msg</label>
       <label class="msgchk" title="Day 1 follow-up done"><input type="checkbox" ${l.d1?'checked':''} onchange="toggleFlag('${l.id}','d1',this.checked)">D1</label>
       <label class="msgchk" title="Day 2 follow-up done"><input type="checkbox" ${l.d2?'checked':''} onchange="toggleFlag('${l.id}','d2',this.checked)">D2</label>
       <label class="msgchk" title="Day 3 follow-up done"><input type="checkbox" ${l.d3?'checked':''} onchange="toggleFlag('${l.id}','d3',this.checked)">D3</label>
