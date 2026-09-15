@@ -1504,6 +1504,9 @@ function jcMondayOf(dateStr){
   d.setDate(d.getDate()-shift);
   return dToStr(d.getTime());
 }
+function jcDayAbbr(dateStr){
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(dateStr+'T00:00:00').getDay()];
+}
 async function renderJobCount(){
   const statsEl=document.getElementById('jcStats');
   const body=document.getElementById('jcBody');
@@ -1514,7 +1517,7 @@ async function renderJobCount(){
   let rows=[];
   try{
     // job_count_daily only ever holds ~21 rows (n8n self-cleans stale dates) — no pagination needed here.
-    const {data,error}=await _sb.from('job_count_daily').select('*').gte('date',todayStr()).order('date',{ascending:true});
+    const {data,error}=await _sb.from('job_count_daily').select('*').gte('date',jcMondayOf(todayStr())).order('date',{ascending:true});
     if(error)throw error;
     rows=data||[];
   }catch(e){
@@ -1541,10 +1544,10 @@ async function renderJobCount(){
   const gap=target-total;
   const avgNeeded=gap>0?(gap/days).toFixed(1):0;
   statsEl.innerHTML=`
-    <div class="stat accent"><div class="k">Booked (next ${days}d)</div><div class="v">${total}</div></div>
+    <div class="stat accent"><div class="k">Booked (3-week window)</div><div class="v">${total}</div></div>
     <div class="stat"><div class="k">Quotes</div><div class="v">${totalQ}</div></div>
     <div class="stat"><div class="k">Work Orders</div><div class="v">${totalWO}</div></div>
-    <div class="stat"><div class="k">Target (${days}d, ${jobTarget}/wk)</div><div class="v">${target}</div></div>
+    <div class="stat"><div class="k">Target (3wk, ${jobTarget}/wk)</div><div class="v">${target}</div></div>
     <div class="stat"><div class="k">${gap>0?'Gap vs Target':'Over Target'}</div><div class="v" style="color:${gap>0?'var(--red)':'var(--green)'}">${Math.abs(gap)}${gap>0?`<small> · ~${avgNeeded}/day</small>`:''}</div></div>`;
   const weekMap=new Map();
   for(const r of rows){
@@ -1570,7 +1573,7 @@ async function renderJobCount(){
   const t=todayStr();
   body.innerHTML=rows.map(r=>`
     <tr${r.date===t?' style="background:#fdf7f3"':''}>
-      <td class="name-cell">${esc(fmtD(r.date))}${r.date===t?' <small>(today)</small>':''}</td>
+      <td class="name-cell">${esc(fmtD(r.date))} <small style="color:var(--muted)">${jcDayAbbr(r.date)}</small>${r.date===t?' <small>(today)</small>':''}</td>
       <td>${r.quotes||0}</td>
       <td>${r.work_orders||0}</td>
       <td style="font-weight:700">${r.total||0}</td>
