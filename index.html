@@ -216,13 +216,24 @@
   .todo input[type=checkbox]{width:18px;height:18px;accent-color:var(--orange);cursor:pointer;flex-shrink:0}
   .todo .tx{flex:1;font-size:14px;font-weight:600}
   .todo.done .tx{text-decoration:line-through;color:var(--muted);font-weight:500}
-  .todo .duechip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#f4f5f7;color:#5b6472;white-space:nowrap}
-  .todo .duechip.over{background:#fee2e2;color:#b91c1c}
   .todo .del{background:none;border:none;color:#c1c5cd;font-size:16px;line-height:1}
   .todo .del:hover{color:var(--red)}
-  .tsec{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:18px 0 8px;letter-spacing:.5px;display:flex;align-items:center}
+  .tsec{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:18px 0 8px;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+  .tsec.today{color:var(--orange-dark)}
+  .tsec small{text-transform:none;font-weight:600;color:var(--orange)}
   .tinput{flex:2;min-width:220px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff}
   .tinput:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(242,106,33,.12)}
+
+  /* To-do gamification */
+  .gamebar{background:linear-gradient(135deg,var(--orange),#ff8a4c);border-radius:14px;padding:14px 18px;margin-bottom:16px;color:#fff;box-shadow:var(--shadow)}
+  .gamebar-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .gamebar-badge{width:40px;height:40px;border-radius:50%;background:#fff;color:var(--orange-dark);font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  .gamebar-title{font-weight:800;font-size:15px}
+  .gamebar-xp{font-size:12px;font-weight:600;opacity:.92}
+  .gamebar-track{background:rgba(255,255,255,.35);border-radius:20px;height:8px;overflow:hidden}
+  .gamebar-fill{background:#fff;height:100%;border-radius:20px;transition:width .4s ease}
+  .todo-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(6px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap}
+  .todo-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   /* Activity history */
   .hist{border:1px solid var(--line);border-radius:9px;max-height:160px;overflow-y:auto;background:#fafbfc}
@@ -445,14 +456,25 @@
 <!-- ================= TO-DO ================= -->
 <section id="page-todo" class="page">
   <div class="wrap" style="max-width:780px;margin:0 auto">
+    <div class="gamebar" id="todoGame">
+      <div class="gamebar-top">
+        <div class="gamebar-badge" id="todoLevelBadge">1</div>
+        <div>
+          <div class="gamebar-title">Level <span id="todoLevelNum">1</span></div>
+          <div class="gamebar-xp" id="todoXpText">0 / 100 XP</div>
+        </div>
+      </div>
+      <div class="gamebar-track"><div class="gamebar-fill" id="todoXpFill" style="width:0%"></div></div>
+    </div>
     <div class="toolbar">
       <input id="todoText" class="tinput" placeholder="Add a task… e.g. Order more degreaser">
-      <input id="todoDue" type="date" class="filter">
+      <select id="todoDay" class="filter"></select>
       <button class="hbtn" onclick="addTodo()">+ Add</button>
     </div>
     <div id="todoList"></div>
   </div>
 </section>
+<div id="todoToast" class="todo-toast"></div>
 
 <!-- ================= JOB COUNT ================= -->
 <section id="page-jobcount" class="page">
@@ -676,6 +698,9 @@ let projects = [];
 let todos = [];
 let staff = ['Staff 1','Staff 2','Staff 3','Staff 4'];
 let jobTarget = 90;
+let todoXp = 0;
+const XP_PER_TASK=20, XP_PER_LEVEL=100;
+const DOW=[['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
 let tpls = [
   {name:'New enquiry reply',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
   {name:'Quote follow-up',text:'Hi {name}, just checking in on the quote we sent for your {service}{value}. Happy to answer any questions or book in a time that suits you. — Rapid Oven Cleaning'},
@@ -780,6 +805,7 @@ async function init(){
     if(cfgData.staff)staff=cfgData.staff;
     if(cfgData.tpls)tpls=cfgData.tpls;
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
+    if(cfgData.todoXp)todoXp=cfgData.todoXp;
   }catch(e){
     console.warn('Supabase load failed, using seed data:',e);
     leads=seed();
@@ -790,6 +816,7 @@ async function init(){
   fillStageSelects();
   fillStaffSelect();
   fillTplSelect();
+  fillTodoDaySelect();
   renderBoard();
   renderTodoBadge();
   startRealtime();
@@ -822,9 +849,11 @@ function startRealtime(){
     if(cfgData.staff)staff=cfgData.staff;
     if(cfgData.tpls)tpls=cfgData.tpls;
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
+    if(cfgData.todoXp!==undefined)todoXp=cfgData.todoXp;
     if(!loading)fillStaffSelect();
     if(!loading)fillTplSelect();
     if(!loading&&document.getElementById('page-jobcount').classList.contains('active'))renderJobCount();
+    if(!loading&&document.getElementById('page-todo').classList.contains('active'))renderGameBar();
   });});
   subscribe('job_count_daily',()=>{debounceSync('job_count_daily',async()=>{
     if(!loading&&document.getElementById('page-jobcount').classList.contains('active'))renderJobCount();
@@ -863,11 +892,11 @@ function seedProjects(){
   ];
 }
 function seedTodos(){
-  const now=Date.now(),D=86400000;
+  const now=Date.now();
   return[
-    {id:uid(),text:'Call back James O\'Brien about rangehood quote',due:dToStr(now),done:false,createdAt:now},
-    {id:uid(),text:'Order degreaser + steel wool refills',due:'',done:false,createdAt:now-1},
-    {id:uid(),text:'Post before/after photos to Facebook page',due:dToStr(now+2*D),done:false,createdAt:now-2},
+    {id:uid(),text:'Call back James O\'Brien about rangehood quote',day:curDow(),done:false,createdAt:now},
+    {id:uid(),text:'Order degreaser + steel wool refills',day:'',done:false,createdAt:now-1},
+    {id:uid(),text:'Post before/after photos to Facebook page',day:'fri',done:false,createdAt:now-2},
   ];
 }
 
@@ -912,7 +941,7 @@ async function deleteTodoDb(id){
   await deleteRow('todos',id);
 }
 async function saveConfig(){
-  const data={staff,tpls,jobTarget};
+  const data={staff,tpls,jobTarget,todoXp};
   const cfg=await fetchAll('config');
   if(cfg.length){
     await _sb.from('config').update({data,updated_at:new Date().toISOString()}).eq('id',cfg[0].id);
@@ -1466,32 +1495,92 @@ async function deleteProject(){
   closeProject();renderProjects();
 }
 
-/* ---------- To-do list ---------- */
+/* ---------- To-do list (Mon–Sun schedule + XP/level game) ---------- */
+function dowOf(dateStr){
+  if(!dateStr)return'';
+  const d=new Date(dateStr+'T00:00:00');
+  return['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
+}
+function curDow(){return dowOf(todayStr());}
+function dayOfTodo(x){return x.day||dowOf(x.due)||'';}
+function fillTodoDaySelect(){
+  const sel=document.getElementById('todoDay');
+  sel.innerHTML='<option value="">Someday</option>'+DOW.map(([code,label])=>`<option value="${code}">${label}</option>`).join('');
+  sel.value=curDow();
+}
+function levelOf(xp){return Math.floor(xp/XP_PER_LEVEL)+1;}
+function renderGameBar(){
+  const lvl=levelOf(todoXp);
+  const into=todoXp-(lvl-1)*XP_PER_LEVEL;
+  document.getElementById('todoLevelBadge').textContent=lvl;
+  document.getElementById('todoLevelNum').textContent=lvl;
+  document.getElementById('todoXpText').textContent=`${into} / ${XP_PER_LEVEL} XP`;
+  document.getElementById('todoXpFill').style.width=(into/XP_PER_LEVEL*100)+'%';
+}
+let todoToastTimer=null;
+function showToast(msg){
+  const el=document.getElementById('todoToast');
+  el.textContent=msg;
+  el.classList.add('show');
+  clearTimeout(todoToastTimer);
+  todoToastTimer=setTimeout(()=>el.classList.remove('show'),1600);
+}
+function awardXp(n){
+  const before=levelOf(todoXp);
+  todoXp=Math.max(0,todoXp+n);
+  saveConfig();
+  renderGameBar();
+  if(n>0){
+    showToast(`+${n} XP`);
+    const after=levelOf(todoXp);
+    if(after>before)setTimeout(()=>showToast(`🎉 Level up — Level ${after}!`),1000);
+  }
+}
 function addTodo(){
   const t=document.getElementById('todoText');
   const txt=t.value.trim();
   if(!txt)return;
-  const todo={id:uid(),text:txt,due:document.getElementById('todoDue').value,done:false,createdAt:Date.now()};
+  const day=document.getElementById('todoDay').value;
+  const todo={id:uid(),text:txt,day,done:false,createdAt:Date.now()};
   todos.push(todo);
-  t.value='';document.getElementById('todoDue').value='';t.focus();
+  t.value='';t.focus();
+  document.getElementById('todoDay').value=curDow();
   saveTodo(todo);renderTodos();
 }
-function toggleTodo(id){const x=todos.find(t=>t.id===id);if(x){x.done=!x.done;saveTodo(x);renderTodos();}}
+function toggleTodo(id){
+  const x=todos.find(t=>t.id===id);
+  if(!x)return;
+  x.done=!x.done;
+  if(x.done&&!x.xpAwarded){x.xpAwarded=true;awardXp(XP_PER_TASK);}
+  else if(!x.done&&x.xpAwarded){x.xpAwarded=false;awardXp(-XP_PER_TASK);}
+  saveTodo(x);renderTodos();
+}
 function delTodo(id){todos=todos.filter(t=>t.id!==id);deleteTodoDb(id);renderTodos();}
 function clearDone(){todos=todos.filter(t=>!t.done);saveTodos();renderTodos();}
 function renderTodos(){
-  const t=todayStr();
-  const pend=todos.filter(x=>!x.done).sort((a,b)=>{const x=a.due||'9999-99-99',y=b.due||'9999-99-99';return x<y?-1:x>y?1:a.createdAt-b.createdAt;});
-  const done=todos.filter(x=>x.done);
+  renderGameBar();
+  const listEl=document.getElementById('todoList');
+  if(!todos.length){listEl.innerHTML='<div class="empty">Nothing to do — nice one! 🎉</div>';return;}
+  const today=curDow();
   const item=x=>`<div class="todo${x.done?' done':''}">
     <input type="checkbox" ${x.done?'checked':''} onchange="toggleTodo('${x.id}')">
     <span class="tx">${esc(x.text)}</span>
-    ${x.due?`<span class="duechip${(!x.done&&x.due<t)?' over':''}">${x.due===t?'Today':fmtD(x.due)}${(!x.done&&x.due<t)?' ⚠':''}</span>`:''}
     <button class="del" onclick="delTodo('${x.id}')" title="Delete">✕</button>
   </div>`;
-  document.getElementById('todoList').innerHTML=
-    (pend.map(item).join('')||'<div class="empty">Nothing to do — nice one! 🎉</div>')+
-    (done.length?`<div class="tsec">Completed (${done.length})<button class="rowbtn" style="margin-left:10px" onclick="clearDone()">Clear</button></div>`+done.map(item).join(''):'');
+  const byDay=code=>todos.filter(x=>dayOfTodo(x)===code).sort((a,b)=>(a.done-b.done)||a.createdAt-b.createdAt);
+  const doneCount=todos.filter(x=>x.done).length;
+  const summary=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <span style="font-size:13px;color:var(--muted);font-weight:600">${doneCount} of ${todos.length} tasks done</span>
+    ${doneCount?`<button class="rowbtn" onclick="clearDone()">Clear completed</button>`:''}
+  </div>`;
+  const groups=DOW.map(([code,label])=>{
+    const items=byDay(code);
+    return `<div class="tsec${code===today?' today':''}">${label}${code===today?' <small>Today</small>':''}</div>`+
+      (items.length?items.map(item).join(''):'<div class="empty" style="padding:10px 0;text-align:left">Nothing scheduled</div>');
+  }).join('');
+  const someday=byDay('');
+  const somedayHtml=someday.length?`<div class="tsec">Someday</div>`+someday.map(item).join(''):'';
+  listEl.innerHTML=summary+groups+somedayHtml;
 }
 function renderTodoBadge(){
   const n=todos.filter(x=>!x.done).length;
