@@ -230,6 +230,10 @@
   .gamebar-badge{width:40px;height:40px;border-radius:50%;background:#fff;color:var(--orange-dark);font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.15)}
   .gamebar-title{font-weight:800;font-size:15px}
   .gamebar-xp{font-size:12px;font-weight:600;opacity:.92}
+  .gamebar-edit{display:flex;align-items:center;gap:6px;flex-shrink:0}
+  .gamebar-edit label{font-size:11px;font-weight:700;color:#fff;opacity:.85;white-space:nowrap}
+  .gamebar-edit input{width:72px;padding:6px 8px;border:none;border-radius:7px;font-size:13px;font-weight:700;text-align:center;background:#fff;color:var(--ink)}
+  .gamebar-edit input:focus{outline:2px solid #fff;outline-offset:1px}
   .gamebar-track{background:rgba(255,255,255,.35);border-radius:20px;height:8px;overflow:hidden}
   .gamebar-fill{background:#fff;height:100%;border-radius:20px;transition:width .4s ease}
   .todo-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(6px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap}
@@ -459,9 +463,13 @@
     <div class="gamebar" id="todoGame">
       <div class="gamebar-top">
         <div class="gamebar-badge" id="todoLevelBadge">1</div>
-        <div>
+        <div style="flex:1">
           <div class="gamebar-title">Level <span id="todoLevelNum">1</span></div>
           <div class="gamebar-xp" id="todoXpText">0 / 100 XP</div>
+        </div>
+        <div class="gamebar-edit">
+          <label for="todoXpEdit">Edit XP</label>
+          <input id="todoXpEdit" type="number" min="0" step="1" onchange="saveTodoXp(this.value)">
         </div>
       </div>
       <div class="gamebar-track"><div class="gamebar-fill" id="todoXpFill" style="width:0%"></div></div>
@@ -1516,6 +1524,14 @@ function renderGameBar(){
   document.getElementById('todoLevelNum').textContent=lvl;
   document.getElementById('todoXpText').textContent=`${into} / ${XP_PER_LEVEL} XP`;
   document.getElementById('todoXpFill').style.width=(into/XP_PER_LEVEL*100)+'%';
+  document.getElementById('todoXpEdit').value=todoXp;
+}
+function saveTodoXp(v){
+  const n=parseInt(v,10);
+  if(isNaN(n)||n<0)return;
+  todoXp=n;
+  saveConfig();
+  renderGameBar();
 }
 let todoToastTimer=null;
 function showToast(msg){
