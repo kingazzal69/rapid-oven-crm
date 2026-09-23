@@ -28,9 +28,11 @@ Single-file CRM (`index.html`) for Rapid Oven Cleaning (Sydney oven/BBQ cleaning
 
 ## SMS follow-up templates
 
-- `tpls` array (near the top of the `<script>` block) holds canned SMS templates with `{name}`/`{service}`/`{value}`/`{suburb}`/`{address}`/`{jobwhen}` placeholders. Editable in the lead modal's Follow-up section, or directly in code (no saved Supabase `config` row exists yet as of writing, so the hardcoded array in `index.html` **is** the live version — check the `config` table first if editing, in case that's changed).
+- `tpls` array (near the top of the `<script>` block) provides default SMS templates with `{name}`/`{service}`/`{value}`/`{suburb}`/`{address}`/`{jobwhen}` placeholders. Supabase `config.data.tpls` overrides the defaults when present. Templates can be edited in the lead modal's Follow-up section and the Bulk SMS composer.
 - `pickTplForStage(stage)` maps pipeline stage → template index for the **quick-SMS 💬 button** that sits on every Pipeline card (opens the phone's native SMS app via an `sms:` URI with the message pre-filled). Keep this mapping in sync if templates are added/reordered.
 - Business voice: texts are signed from "Brenna" at Rapid Oven Cleaning — casual, short, no corporate tone.
+- Bulk SMS lives in the Clients Database toolbar. It keeps row selections across pages and filters in `sessionStorage`, then personalises the chosen template for each checked client.
+- Bulk sends go through `supabase/functions/bulk-sms/index.ts`, which verifies Supabase Auth and the `SMS_ALLOWED_EMAILS` allowlist before forwarding to the protected n8n webhook. MobileMessage API credentials belong in n8n, never in the static page. See `supabase/functions/bulk-sms/SETUP.md` for deployment and workflow setup.
 
 ## Integrations this CRM depends on (external, not in this repo)
 

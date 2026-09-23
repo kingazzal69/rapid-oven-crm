@@ -139,6 +139,15 @@
   .pager .gap{color:var(--muted);padding:0 2px;font-weight:700}
   .clientcount{margin-bottom:12px;font-size:14px;color:var(--ink-2);font-weight:600}
   .clientcount b{color:var(--orange);font-weight:800}
+  .bulk-sms-count{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+  .bulk-sms-preview{border:1px solid var(--line);border-radius:10px;max-height:260px;overflow:auto;background:#fafbfc}
+  .bulk-sms-preview-item{padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+  .bulk-sms-preview-item:last-child{border-bottom:none}
+  .bulk-sms-preview-item strong{display:block;margin-bottom:5px;color:#374151}
+  .bulk-sms-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:6px}
+  .bulk-sms-status{font-size:13px;line-height:1.5;margin:8px 0 0;white-space:pre-wrap}
+  .bulk-sms-status.error{color:var(--red)}
+  .bulk-sms-status.success{color:var(--green)}
 
   /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
@@ -294,6 +303,7 @@
     #map{height:calc(100vh - 190px)}
     .toolbar{gap:8px}
     .search{min-width:100%}
+    #bulkSmsButton{flex:1}
     select.filter{flex:1;min-width:120px}
     .daterange{width:100%}
     .daterange input.filter{flex:1;width:auto;min-width:0}
@@ -370,6 +380,8 @@
       <select class="filter" id="fStage" onchange="filterChanged()">
         <option value="">All stages</option>
       </select>
+      <button class="btn sec" id="bulkSmsButton" onclick="openBulkSmsModal()" disabled>Bulk SMS</button>
+      <span id="bulkSmsCount" class="bulk-sms-count" aria-live="polite">0 selected</span>
       <select class="filter" id="fSvc" onchange="filterChanged()">
         <option value="">All services</option>
         <option>Oven Clean</option><option>BBQ Clean</option><option>Rangehood Clean</option><option>Stovetop Clean</option><option>Full Kitchen</option>
@@ -528,6 +540,55 @@
   </div>
 </section>
 
+<!-- ================= BULK SMS MODAL ================= -->
+<div class="overlay" id="bulkSmsOverlay">
+  <div class="modal" style="width:720px">
+    <div class="modal-head">
+      <h3>Bulk SMS</h3>
+      <button class="x" onclick="closeBulkSmsModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="bulkSmsAuthSignedOut">
+        <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px">Sign in with an authorised CRM account to send messages. SMS access is checked again by the server.</p>
+        <div class="field full"><label for="bulkSmsEmail">Email</label><input id="bulkSmsEmail" type="email" autocomplete="username" placeholder="you@example.com"></div>
+        <div class="field full"><label for="bulkSmsPassword">Password</label><input id="bulkSmsPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signInBulkSms()"></div>
+        <button class="btn primary" id="bulkSmsSignInButton" onclick="signInBulkSms()">Sign in</button>
+      </div>
+      <div id="bulkSmsAuthSignedIn" class="hide" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <span id="bulkSmsSignedInAs" style="font-size:13px;font-weight:700;color:var(--green)"></span>
+        <button class="tbtn" onclick="signOutBulkSms()">Sign out</button>
+      </div>
+      <div id="bulkSmsComposer" class="hide">
+        <div class="field full">
+          <label id="bulkSmsRecipientLabel" for="bulkSmsTemplate">Recipients</label>
+          <div class="bulk-sms-note">Checked clients stay selected as you change pages or filters. Uncheck them in the table to remove them.</div>
+        </div>
+        <div class="field full">
+          <label for="bulkSmsTemplate">Message template</label>
+          <div class="tplbar">
+            <select id="bulkSmsTemplate" title="Hover to read the selected message" onchange="bulkSmsTemplateChanged()"></select>
+            <button class="tbtn" id="bulkSmsSaveTemplateButton" onclick="saveBulkSmsTemplate()">Save template</button>
+          </div>
+          <textarea id="bulkSmsText" rows="3" oninput="bulkSmsRequestId=null;document.getElementById('bulkSmsTemplate').title=this.value;renderBulkSmsPreview()"></textarea>
+        </div>
+        <div class="field full">
+          <label>Personalised preview</label>
+          <div id="bulkSmsPreview" class="bulk-sms-preview"></div>
+          <div id="bulkSmsPreviewMore" class="bulk-sms-note"></div>
+        </div>
+      </div>
+      <div id="bulkSmsStatus" class="bulk-sms-status" role="status" aria-live="polite"></div>
+    </div>
+    <div class="modal-foot">
+      <span id="bulkSmsFooterCount" class="bulk-sms-count">0 selected</span>
+      <div style="display:flex;gap:10px">
+        <button class="btn sec" onclick="closeBulkSmsModal()">Cancel</button>
+        <button class="btn primary hide" id="bulkSmsSendButton" onclick="sendBulkSms()">Send SMS</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= PROJECT MODAL ================= -->
 <div class="overlay" id="overlay2">
   <div class="modal">
@@ -680,6 +741,8 @@
 const SUPABASE_URL = 'https://haarvltpfcbixqbwkxpl.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYXJ2bHRwZmNiaXhxYndreHBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4ODExMzAsImV4cCI6MjA5OTQ1NzEzMH0.vqLvv_N_tTsRgngxeOAUUIZowmfilvQrfFG6srkRLQM';
 const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+/* Keep SMS sign-in separate so it cannot change the CRM data client's anonymous access context. */
+const _smsSb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {auth:{storageKey:'rapid-oven-crm-sms-auth',persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 
 /* ---------- Stage config ---------- */
 const STAGES = [
@@ -702,6 +765,10 @@ function activeLeads(){return leads.filter(l=>!l.archived);}
 
 /* ---------- Data ---------- */
 let leads = [];
+const BULK_SMS_SELECTION_KEY='rapidCrmBulkSmsSelected';
+function readBulkSmsSelection(){try{const ids=JSON.parse(sessionStorage.getItem(BULK_SMS_SELECTION_KEY)||'[]');return Array.isArray(ids)?ids:[]}catch(_){return[]}}
+let selectedClientIds=new Set(readBulkSmsSelection().map(String));
+let bulkSmsRequestId=null,bulkSmsSending=false,bulkSmsUser=null;
 let projects = [];
 let todos = [];
 let staff = ['Staff 1','Staff 2','Staff 3','Staff 4'];
@@ -1160,7 +1227,24 @@ function fuChip(l){
 /* ---------- Select all ---------- */
 function toggleSelectAll(){
   const cb=document.getElementById('selectAll');
-  document.querySelectorAll('.rowCheck').forEach(c=>c.checked=cb.checked);
+  document.querySelectorAll('.rowCheck').forEach(c=>{
+    c.checked=cb.checked;
+    if(cb.checked)selectedClientIds.add(String(c.value));
+    else selectedClientIds.delete(String(c.value));
+  });
+  bulkSmsRequestId=null;
+  persistBulkSmsSelection();
+  renderBulkSmsButton();
+}
+function persistBulkSmsSelection(){
+  try{sessionStorage.setItem(BULK_SMS_SELECTION_KEY,JSON.stringify([...selectedClientIds]));}catch(_){/* selection remains active for this page */}
+}
+function setClientSelected(id,checked){
+  id=String(id);
+  if(checked)selectedClientIds.add(id);else selectedClientIds.delete(id);
+  bulkSmsRequestId=null;
+  persistBulkSmsSelection();
+  renderBulkSmsButton();
 }
 
 /* ---------- Table ---------- */
@@ -1192,7 +1276,7 @@ function renderTable(){
   tb.innerHTML=pageRows.map((l,i)=>{
     const st=stageMap[l.stage];
     return `<tr onclick="rowOpen(event,'${l.id}')">
-      <td style="width:28px"><input type="checkbox" class="rowCheck" value="${l.id}" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:14px;height:14px;cursor:pointer"></td>
+      <td style="width:28px"><input type="checkbox" class="rowCheck" value="${esc(l.id)}" ${selectedClientIds.has(String(l.id))?'checked':''} onchange="setClientSelected(this.value,this.checked)" onclick="event.stopPropagation()" style="accent-color:var(--orange);width:14px;height:14px;cursor:pointer"></td>
       <td style="width:28px;color:var(--muted);font-size:12px">${start+i+1}</td>
       <td class="name-cell">${esc(l.name)}<small>${telLink(l.phone)}${l.phone&&l.email?' · ':''}${esc(l.email||'')}</small></td>
       <td>${esc(l.service)}</td>
@@ -1210,7 +1294,12 @@ function renderTable(){
   document.getElementById('clientCount').innerHTML=filtered
     ?`<b>${total.toLocaleString()}</b> ${total===1?'client':'clients'} match <span style="color:var(--muted);font-weight:600">(of ${totalAll.toLocaleString()} total)</span>`
     :`<b>${total.toLocaleString()}</b> total ${total===1?'client':'clients'}`;
+  const selectAll=document.getElementById('selectAll');
+  const checkedOnPage=pageRows.filter(l=>selectedClientIds.has(String(l.id))).length;
+  selectAll.checked=pageRows.length>0&&checkedOnPage===pageRows.length;
+  selectAll.indeterminate=checkedOnPage>0&&checkedOnPage<pageRows.length;
   renderPager(total,pages,start,pageRows.length);
+  renderBulkSmsButton();
 }
 function renderPager(total,pages,start,shown){
   const el=document.getElementById('pager');
@@ -1853,9 +1942,8 @@ function pickTplForStage(stage){
   if(stage==='lost')return 6;     // Closed — Lost
   return 0;                       // New enquiry reply (new/contacted/default)
 }
-function tplTextForLead(l,i){
-  const t=tpls[i]||tpls[0];
-  if(!t)return'';
+function personaliseSmsText(l,templateText){
+  if(!templateText)return'';
   const first=firstNameOf(l.name);
   const map={
     '{name}':first,
@@ -1865,7 +1953,181 @@ function tplTextForLead(l,i){
     '{address}':l.address||'',
     '{jobwhen}':l.jobDate?' for '+fmtD(l.jobDate)+(l.jobTime?' at '+fmtTime12(l.jobTime):''):'',
   };
-  return t.text.replace(/\{name\}|\{service\}|\{value\}|\{suburb\}|\{address\}|\{jobwhen\}/g,m=>map[m]??m);
+  return templateText.replace(/\{name\}|\{service\}|\{value\}|\{suburb\}|\{address\}|\{jobwhen\}/g,m=>map[m]??m);
+}
+function tplTextForLead(l,i){
+  const t=tpls[i]||tpls[0];
+  return personaliseSmsText(l,t?t.text:'');
+}
+function getSelectedClientLeads(){
+  const selected=new Set([...selectedClientIds].map(String));
+  return leads.filter(l=>selected.has(String(l.id)));
+}
+function renderBulkSmsButton(){
+  const count=getSelectedClientLeads().length;
+  const button=document.getElementById('bulkSmsButton');
+  const label=document.getElementById('bulkSmsCount');
+  if(!button||!label)return;
+  button.disabled=count===0;
+  button.setAttribute('aria-label',`Bulk SMS to ${count} selected clients`);
+  label.textContent=`${count.toLocaleString()} selected`;
+  const footer=document.getElementById('bulkSmsFooterCount');
+  if(footer)footer.textContent=`${count.toLocaleString()} selected`;
+  const recipientLabel=document.getElementById('bulkSmsRecipientLabel');
+  if(recipientLabel)recipientLabel.textContent=`Recipients · ${count.toLocaleString()} selected across pages and filters`;
+  const send=document.getElementById('bulkSmsSendButton');
+  if(send){send.textContent=`Send SMS to ${count.toLocaleString()}`;send.disabled=bulkSmsSending||count===0;}
+  if(document.getElementById('bulkSmsOverlay')?.classList.contains('open'))renderBulkSmsPreview();
+}
+function setBulkSmsStatus(message,type=''){
+  const el=document.getElementById('bulkSmsStatus');
+  el.textContent=message||'';
+  el.className='bulk-sms-status'+(type?' '+type:'');
+}
+function bulkSmsTemplateChanged(){
+  bulkSmsRequestId=null;
+  const template=tpls[+document.getElementById('bulkSmsTemplate').value];
+  document.getElementById('bulkSmsText').value=template?template.text:'';
+  document.getElementById('bulkSmsTemplate').title=template?template.text:'No message template selected';
+  setBulkSmsStatus('');
+  renderBulkSmsPreview();
+}
+function renderBulkSmsPreview(){
+  const selected=getSelectedClientLeads();
+  const template=document.getElementById('bulkSmsText')?.value||'';
+  const preview=selected.slice(0,5);
+  document.getElementById('bulkSmsPreview').innerHTML=preview.map(l=>{
+    const phone=(l.phone||'').trim()||'No phone number';
+    return `<div class="bulk-sms-preview-item"><strong>${esc(l.name)} · ${esc(phone)}</strong>${esc(personaliseSmsText(l,template))}</div>`;
+  }).join('')||'<div class="bulk-sms-preview-item">Select clients in the table to preview messages.</div>';
+  const more=Math.max(0,selected.length-preview.length);
+  const invalid=selected.filter(l=>!isAustralianMobile(l.phone));
+  const notes=[];
+  if(more)notes.push(`Showing 5 of ${selected.length.toLocaleString()} personalised messages.`);
+  if(invalid.length)notes.push(`${invalid.length.toLocaleString()} selected ${invalid.length===1?'client has':'clients have'} no valid Australian mobile number; update or uncheck them before sending.`);
+  if(selected.length>10000)notes.push('MobileMessage allows up to 10,000 recipients per batch. Uncheck clients to reduce this batch.');
+  document.getElementById('bulkSmsPreviewMore').textContent=notes.join(' ');
+  const send=document.getElementById('bulkSmsSendButton');
+  if(send){
+    send.disabled=bulkSmsSending||selected.length===0||selected.length>10000||!template.trim()||invalid.length>0||!bulkSmsUser;
+    send.textContent=`Send SMS to ${selected.length.toLocaleString()}`;
+  }
+  const label=document.getElementById('bulkSmsFooterCount');
+  if(label)label.textContent=`${selected.length.toLocaleString()} selected`;
+}
+function isAustralianMobile(phone){
+  const digits=(phone||'').replace(/\D/g,'');
+  return /^(?:04\d{8}|614\d{8})$/.test(digits);
+}
+function openBulkSmsModal(){
+  const selected=getSelectedClientLeads();
+  if(!selected.length)return;
+  bulkSmsRequestId=null;
+  bulkSmsSending=false;
+  const select=document.getElementById('bulkSmsTemplate');
+  select.innerHTML=tpls.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('');
+  document.getElementById('bulkSmsOverlay').classList.add('open');
+  document.getElementById('bulkSmsComposer').classList.remove('hide');
+  document.getElementById('bulkSmsSendButton').classList.remove('hide');
+  setBulkSmsStatus('');
+  if(tpls.length)bulkSmsTemplateChanged();
+  renderBulkSmsButton();
+  _smsSb.auth.getSession().then(({data,error})=>{
+    if(error){setBulkSmsAuth(null);setBulkSmsStatus('Could not check sign-in status. Please sign in again.','error');return;}
+    setBulkSmsAuth(data.session?.user||null);
+  });
+}
+function closeBulkSmsModal(){
+  if(bulkSmsSending)return;
+  document.getElementById('bulkSmsOverlay').classList.remove('open');
+  document.getElementById('bulkSmsPassword').value='';
+  bulkSmsRequestId=null;
+}
+function setBulkSmsAuth(user){
+  bulkSmsUser=user||null;
+  document.getElementById('bulkSmsAuthSignedOut').classList.toggle('hide',!!bulkSmsUser);
+  document.getElementById('bulkSmsAuthSignedIn').classList.toggle('hide',!bulkSmsUser);
+  document.getElementById('bulkSmsComposer').classList.remove('hide');
+  document.getElementById('bulkSmsSendButton').classList.remove('hide');
+  document.getElementById('bulkSmsSignedInAs').textContent=bulkSmsUser?`Signed in as ${bulkSmsUser.email||'authorised CRM user'}`:'';
+  document.getElementById('bulkSmsSignInButton').disabled=false;
+  renderBulkSmsPreview();
+}
+async function signInBulkSms(){
+  const email=document.getElementById('bulkSmsEmail').value.trim();
+  const password=document.getElementById('bulkSmsPassword').value;
+  if(!email||!password){setBulkSmsStatus('Enter your authorised CRM email and password.','error');return;}
+  const button=document.getElementById('bulkSmsSignInButton');
+  button.disabled=true;setBulkSmsStatus('Signing in…');
+  try{
+    const {data,error}=await _smsSb.auth.signInWithPassword({email,password});
+    if(error)throw error;
+    document.getElementById('bulkSmsPassword').value='';
+    setBulkSmsAuth(data.user);
+    setBulkSmsStatus('Signed in. Review the personalised messages, then send when ready.','success');
+  }catch(e){
+    setBulkSmsStatus(e.message||'Sign-in failed. Check your credentials and try again.','error');
+  }finally{button.disabled=false;}
+}
+async function signOutBulkSms(){
+  const {error}=await _smsSb.auth.signOut();
+  setBulkSmsAuth(null);
+  setBulkSmsStatus(error?error.message:'Signed out.','');
+}
+async function saveBulkSmsTemplate(){
+  const i=+document.getElementById('bulkSmsTemplate').value;
+  if(!tpls[i])return;
+  const button=document.getElementById('bulkSmsSaveTemplateButton');
+  button.disabled=true;
+  try{
+    tpls[i].text=document.getElementById('bulkSmsText').value;
+    await saveConfig();
+    setBulkSmsStatus(`Saved changes to “${tpls[i].name}”.`,'success');
+  }catch(e){setBulkSmsStatus('Could not save the template: '+(e.message||'unknown error'),'error');}
+  finally{button.disabled=false;}
+  renderBulkSmsPreview();
+}
+function newBulkSmsRequestId(){
+  return crypto.randomUUID?crypto.randomUUID():`sms-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+async function sendBulkSms(){
+  if(bulkSmsSending)return;
+  const selected=getSelectedClientLeads();
+  const templateText=document.getElementById('bulkSmsText').value;
+  if(!bulkSmsUser){setBulkSmsStatus('Sign in with an authorised CRM account before sending.','error');return;}
+  if(!selected.length){setBulkSmsStatus('Select at least one client in the table.','error');return;}
+  const invalid=selected.filter(l=>!isAustralianMobile(l.phone));
+  if(invalid.length){setBulkSmsStatus(`${invalid.length} selected ${invalid.length===1?'client has':'clients have'} no valid Australian mobile number. Update their record or uncheck them before sending.`,'error');return;}
+  if(!templateText.trim()){setBulkSmsStatus('Choose a template or enter a message before sending.','error');return;}
+  if(selected.length>10000){setBulkSmsStatus('MobileMessage accepts up to 10,000 messages per batch. Reduce the selected clients before sending.','error');return;}
+  if(!confirm(`Send ${selected.length.toLocaleString()} personalised SMS messages to the checked clients?`))return;
+  if(!bulkSmsRequestId)bulkSmsRequestId=newBulkSmsRequestId();
+  const template=tpls[+document.getElementById('bulkSmsTemplate').value];
+  const messages=selected.map(l=>({lead_id:String(l.id),to:l.phone.replace(/[\s().-]/g,''),message:personaliseSmsText(l,templateText)}));
+  const send=document.getElementById('bulkSmsSendButton');
+  bulkSmsSending=true;send.disabled=true;
+  document.getElementById('bulkSmsTemplate').disabled=true;
+  document.getElementById('bulkSmsText').disabled=true;
+  document.getElementById('bulkSmsSaveTemplateButton').disabled=true;
+  setBulkSmsStatus(`Sending ${selected.length.toLocaleString()} messages to the secure n8n workflow…`);
+  try{
+    const {data,error}=await _smsSb.functions.invoke('bulk-sms',{body:{request_id:bulkSmsRequestId,template_name:template?.name||'Custom message',messages}});
+    if(error)throw error;
+    if(!data||data.status!=='accepted')throw new Error(data?.error||'The SMS workflow did not confirm the batch.');
+    const sentCount=selected.length;
+    selectedClientIds.clear();persistBulkSmsSelection();renderTable();
+    bulkSmsRequestId=null;
+    closeBulkSmsModal();
+    showToast(`Queued ${sentCount.toLocaleString()} SMS messages`);
+  }catch(e){
+    setBulkSmsStatus(e.message||'The SMS batch could not be sent. Your selections are still saved.','error');
+  }finally{
+    bulkSmsSending=false;
+    document.getElementById('bulkSmsTemplate').disabled=false;
+    document.getElementById('bulkSmsText').disabled=false;
+    document.getElementById('bulkSmsSaveTemplateButton').disabled=false;
+    if(document.getElementById('bulkSmsOverlay').classList.contains('open'))renderBulkSmsButton();
+  }
 }
 function quickSms(id){
   const l=leads.find(x=>x.id===id);
