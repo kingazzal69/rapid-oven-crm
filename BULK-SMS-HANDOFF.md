@@ -80,3 +80,4 @@ RLS policies that keep the CRM working (it uses the anon key with no login). Sep
 - Review-screen warning for non-GSM characters (—, ’, emoji) that MobileMessage would drop.
 - Bulk templates with Aaron's "book now" link (ask which booking link he uses).
 - Whole-CRM login + two-factor (bigger job, separate).
+
