@@ -148,6 +148,18 @@
   .bulk-sms-status{font-size:13px;line-height:1.5;margin:8px 0 0;white-space:pre-wrap}
   .bulk-sms-status.error{color:var(--red)}
   .bulk-sms-status.success{color:var(--green)}
+  #bulkSmsButton:disabled,#bulkSmsOverlay .btn:disabled,#bulkSmsOverlay .tbtn:disabled{opacity:.45;cursor:not-allowed}
+  .bulk-sms-signedin{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--green)}
+  .bulk-sms-section{margin-top:14px}
+  .bulk-sms-section summary{cursor:pointer;font-size:13px;font-weight:700;color:#374151}
+  .bulk-sms-section h4{font-size:13px;font-weight:800;margin:0 0 6px}
+  .bulk-sms-section.bad h4{color:var(--red)}
+  .bulk-sms-section.warn h4{color:var(--orange)}
+  .bulk-sms-section.good h4{color:var(--green)}
+  .bulk-sms-section ul{margin:0 0 8px 18px;font-size:13px;line-height:1.6}
+  .bulk-sms-summary{font-size:14px;font-weight:700;line-height:1.5}
+  .bulk-sms-choice{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+  .bulk-sms-optout{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)}
 
   /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(15,17,20,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
@@ -548,20 +560,27 @@
       <button class="x" onclick="closeBulkSmsModal()" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body">
-      <div id="bulkSmsAuthSignedOut">
-        <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px">Sign in with an authorised CRM account to send messages. SMS access is checked again by the server.</p>
-        <div class="field full"><label for="bulkSmsEmail">Email</label><input id="bulkSmsEmail" type="email" autocomplete="username" placeholder="you@example.com"></div>
+      <div id="bulkSmsSignedIn" class="bulk-sms-signedin hide">
+        <span id="bulkSmsSignedInAs"></span>
+        <button class="tbtn" onclick="signOutBulkSms()">Sign out</button>
+      </div>
+      <div id="bulkSmsSignIn" class="hide">
+        <p class="bulk-sms-note" style="margin:0 0 14px">Sign in with your bulk SMS account. The server checks access again before anything is sent.</p>
+        <div class="field full"><label for="bulkSmsEmail">Email</label><input id="bulkSmsEmail" type="email" autocomplete="username"></div>
         <div class="field full"><label for="bulkSmsPassword">Password</label><input id="bulkSmsPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signInBulkSms()"></div>
         <button class="btn primary" id="bulkSmsSignInButton" onclick="signInBulkSms()">Sign in</button>
       </div>
-      <div id="bulkSmsAuthSignedIn" class="hide" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-        <span id="bulkSmsSignedInAs" style="font-size:13px;font-weight:700;color:var(--green)"></span>
-        <button class="tbtn" onclick="signOutBulkSms()">Sign out</button>
+      <div id="bulkSmsMfa" class="hide">
+        <p id="bulkSmsMfaIntro" class="bulk-sms-note" style="margin:0 0 12px"></p>
+        <img id="bulkSmsMfaQr" class="hide" alt="QR code for setting up two-factor sign-in" style="width:180px;height:180px;display:block;margin-bottom:8px">
+        <div id="bulkSmsMfaSecret" class="bulk-sms-note hide" style="margin-bottom:12px;overflow-wrap:anywhere"></div>
+        <div class="field full"><label for="bulkSmsMfaCode">6-digit code</label><input id="bulkSmsMfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" onkeydown="if(event.key==='Enter')verifyBulkSmsMfa()"></div>
+        <button class="btn primary" id="bulkSmsMfaButton" onclick="verifyBulkSmsMfa()">Verify</button>
       </div>
       <div id="bulkSmsComposer" class="hide">
         <div class="field full">
-          <label id="bulkSmsRecipientLabel" for="bulkSmsTemplate">Recipients</label>
-          <div class="bulk-sms-note">Checked clients stay selected as you change pages or filters. Uncheck them in the table to remove them.</div>
+          <label id="bulkSmsRecipientLabel">Recipients</label>
+          <div class="bulk-sms-note">Only the clients you've ticked are texted. Ticks stay as you change pages or filters; untick someone in the table to remove them.</div>
         </div>
         <div class="field full">
           <label for="bulkSmsTemplate">Message template</label>
@@ -569,21 +588,34 @@
             <select id="bulkSmsTemplate" title="Hover to read the selected message" onchange="bulkSmsTemplateChanged()"></select>
             <button class="tbtn" id="bulkSmsSaveTemplateButton" onclick="saveBulkSmsTemplate()">Save template</button>
           </div>
-          <textarea id="bulkSmsText" rows="3" oninput="bulkSmsRequestId=null;document.getElementById('bulkSmsTemplate').title=this.value;renderBulkSmsPreview()"></textarea>
+          <textarea id="bulkSmsText" rows="3" aria-label="Message text" oninput="document.getElementById('bulkSmsTemplate').title=this.value;invalidateBulkSmsReview();renderBulkSmsPreview()"></textarea>
         </div>
         <div class="field full">
           <label>Personalised preview</label>
           <div id="bulkSmsPreview" class="bulk-sms-preview"></div>
           <div id="bulkSmsPreviewMore" class="bulk-sms-note"></div>
         </div>
+        <details id="bulkSmsOptOut" class="bulk-sms-section">
+          <summary id="bulkSmsOptOutSummary">Opt-out list</summary>
+          <div class="bulk-sms-note" style="margin:6px 0 8px">Numbers here are never bulk-texted, even if ticked.</div>
+          <div class="tplbar">
+            <input id="bulkSmsOptOutNumber" inputmode="tel" placeholder="Mobile number" style="flex:1;min-width:140px" onkeydown="if(event.key==='Enter')addBulkSmsOptOut()">
+            <button class="tbtn" onclick="addBulkSmsOptOut()">Add</button>
+          </div>
+          <div id="bulkSmsOptOutList"></div>
+        </details>
       </div>
+      <div id="bulkSmsReview" class="hide"></div>
+      <div id="bulkSmsResult" class="hide"></div>
       <div id="bulkSmsStatus" class="bulk-sms-status" role="status" aria-live="polite"></div>
     </div>
     <div class="modal-foot">
       <span id="bulkSmsFooterCount" class="bulk-sms-count">0 selected</span>
       <div style="display:flex;gap:10px">
-        <button class="btn sec" onclick="closeBulkSmsModal()">Cancel</button>
-        <button class="btn primary hide" id="bulkSmsSendButton" onclick="sendBulkSms()">Send SMS</button>
+        <button class="btn sec" id="bulkSmsCloseButton" onclick="closeBulkSmsModal()">Cancel</button>
+        <button class="btn sec hide" id="bulkSmsBackButton" onclick="backToBulkSmsComposer()">Back</button>
+        <button class="btn primary hide" id="bulkSmsReviewButton" onclick="reviewBulkSms()">Review</button>
+        <button class="btn primary hide" id="bulkSmsSendButton" onclick="sendBulkSms()">Send</button>
       </div>
     </div>
   </div>
@@ -768,7 +800,8 @@ let leads = [];
 const BULK_SMS_SELECTION_KEY='rapidCrmBulkSmsSelected';
 function readBulkSmsSelection(){try{const ids=JSON.parse(sessionStorage.getItem(BULK_SMS_SELECTION_KEY)||'[]');return Array.isArray(ids)?ids:[]}catch(_){return[]}}
 let selectedClientIds=new Set(readBulkSmsSelection().map(String));
-let bulkSmsRequestId=null,bulkSmsSending=false,bulkSmsUser=null;
+const BULK_SMS_BATCH_KEY='rapidCrmBulkSmsBatch';
+let bulkSmsSending=false,bulkSmsUser=null,bulkSmsStep='',bulkSmsTemplates=[],bulkSmsReviewData=null,bulkSmsMfaFactorId=null;
 let projects = [];
 let todos = [];
 let staff = ['Staff 1','Staff 2','Staff 3','Staff 4'];
@@ -1232,7 +1265,7 @@ function toggleSelectAll(){
     if(cb.checked)selectedClientIds.add(String(c.value));
     else selectedClientIds.delete(String(c.value));
   });
-  bulkSmsRequestId=null;
+  invalidateBulkSmsReview();
   persistBulkSmsSelection();
   renderBulkSmsButton();
 }
@@ -1242,7 +1275,7 @@ function persistBulkSmsSelection(){
 function setClientSelected(id,checked){
   id=String(id);
   if(checked)selectedClientIds.add(id);else selectedClientIds.delete(id);
-  bulkSmsRequestId=null;
+  invalidateBulkSmsReview();
   persistBulkSmsSelection();
   renderBulkSmsButton();
 }
@@ -1959,12 +1992,31 @@ function tplTextForLead(l,i){
   const t=tpls[i]||tpls[0];
   return personaliseSmsText(l,t?t.text:'');
 }
+/* ---------- Bulk SMS ---------- */
+/* Flow: sign in → two-factor code → write message → server review → send once → result.
+   Everything that matters (who's allowed, numbers, opt-outs, duplicates, sending) is re-checked by
+   supabase/functions/bulk-sms; this page only shows what the server decides. */
 function getSelectedClientLeads(){
-  const selected=new Set([...selectedClientIds].map(String));
-  return leads.filter(l=>selected.has(String(l.id)));
+  return leads.filter(l=>selectedClientIds.has(String(l.id)));
+}
+function fmtMobile(n){return n&&n.length===11?'0'+n.slice(2,5)+' '+n.slice(5,8)+' '+n.slice(8):(n||'');}
+function readBulkSmsBatch(){try{const v=JSON.parse(sessionStorage.getItem(BULK_SMS_BATCH_KEY)||'null');return v&&typeof v.key==='string'?v:null;}catch(_){return null;}}
+function writeBulkSmsBatch(v){try{if(v)sessionStorage.setItem(BULK_SMS_BATCH_KEY,JSON.stringify(v));else sessionStorage.removeItem(BULK_SMS_BATCH_KEY);}catch(_){/* recovery after reload unavailable; the server still blocks double sends */}}
+function newBulkSmsKey(){return 'b-'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));}
+async function callBulkSms(action,body={}){
+  try{
+    const {data,error}=await _smsSb.functions.invoke('bulk-sms',{body:{action,...body}});
+    if(!error)return{ok:true,status:200,data};
+    let status=0,payload=null;
+    if(error.context&&typeof error.context.json==='function'){
+      status=error.context.status||0;
+      try{payload=await error.context.json();}catch(_){}
+    }
+    return{ok:false,status,data:payload,error:(payload&&payload.error)||'Could not reach the bulk SMS service.'};
+  }catch(e){return{ok:false,status:0,data:null,error:'Could not reach the bulk SMS service.'};}
 }
 function renderBulkSmsButton(){
-  const count=getSelectedClientLeads().length;
+  const count=selectedClientIds.size;
   const button=document.getElementById('bulkSmsButton');
   const label=document.getElementById('bulkSmsCount');
   if(!button||!label)return;
@@ -1974,160 +2026,386 @@ function renderBulkSmsButton(){
   const footer=document.getElementById('bulkSmsFooterCount');
   if(footer)footer.textContent=`${count.toLocaleString()} selected`;
   const recipientLabel=document.getElementById('bulkSmsRecipientLabel');
-  if(recipientLabel)recipientLabel.textContent=`Recipients · ${count.toLocaleString()} selected across pages and filters`;
-  const send=document.getElementById('bulkSmsSendButton');
-  if(send){send.textContent=`Send SMS to ${count.toLocaleString()}`;send.disabled=bulkSmsSending||count===0;}
-  if(document.getElementById('bulkSmsOverlay')?.classList.contains('open'))renderBulkSmsPreview();
+  if(recipientLabel)recipientLabel.textContent=`Recipients · ${count.toLocaleString()} ticked across pages and filters`;
+  if(bulkSmsStep==='compose')renderBulkSmsPreview();
 }
 function setBulkSmsStatus(message,type=''){
   const el=document.getElementById('bulkSmsStatus');
   el.textContent=message||'';
   el.className='bulk-sms-status'+(type?' '+type:'');
 }
-function bulkSmsTemplateChanged(){
-  bulkSmsRequestId=null;
-  const template=tpls[+document.getElementById('bulkSmsTemplate').value];
-  document.getElementById('bulkSmsText').value=template?template.text:'';
-  document.getElementById('bulkSmsTemplate').title=template?template.text:'No message template selected';
-  setBulkSmsStatus('');
-  renderBulkSmsPreview();
+function showBulkSmsStep(step){
+  bulkSmsStep=step;
+  const on=(id,v)=>document.getElementById(id).classList.toggle('hide',!v);
+  on('bulkSmsSignIn',step==='signin');
+  on('bulkSmsMfa',step==='mfa');
+  on('bulkSmsComposer',step==='compose');
+  on('bulkSmsReview',step==='review');
+  on('bulkSmsResult',step==='result');
+  on('bulkSmsSignedIn',!!bulkSmsUser&&step!=='signin');
+  on('bulkSmsReviewButton',step==='compose');
+  on('bulkSmsBackButton',step==='review');
+  on('bulkSmsSendButton',step==='review');
+  document.getElementById('bulkSmsSignedInAs').textContent=bulkSmsUser?`Signed in as ${bulkSmsUser.email||'bulk SMS user'}`:'';
+  document.getElementById('bulkSmsCloseButton').textContent=step==='result'?'Close':'Cancel';
+  if(step==='compose')renderBulkSmsPreview();
 }
-function renderBulkSmsPreview(){
-  const selected=getSelectedClientLeads();
-  const template=document.getElementById('bulkSmsText')?.value||'';
-  const preview=selected.slice(0,5);
-  document.getElementById('bulkSmsPreview').innerHTML=preview.map(l=>{
-    const phone=(l.phone||'').trim()||'No phone number';
-    return `<div class="bulk-sms-preview-item"><strong>${esc(l.name)} · ${esc(phone)}</strong>${esc(personaliseSmsText(l,template))}</div>`;
-  }).join('')||'<div class="bulk-sms-preview-item">Select clients in the table to preview messages.</div>';
-  const more=Math.max(0,selected.length-preview.length);
-  const invalid=selected.filter(l=>!isAustralianMobile(l.phone));
-  const notes=[];
-  if(more)notes.push(`Showing 5 of ${selected.length.toLocaleString()} personalised messages.`);
-  if(invalid.length)notes.push(`${invalid.length.toLocaleString()} selected ${invalid.length===1?'client has':'clients have'} no valid Australian mobile number; update or uncheck them before sending.`);
-  if(selected.length>10000)notes.push('MobileMessage allows up to 10,000 recipients per batch. Uncheck clients to reduce this batch.');
-  document.getElementById('bulkSmsPreviewMore').textContent=notes.join(' ');
-  const send=document.getElementById('bulkSmsSendButton');
-  if(send){
-    send.disabled=bulkSmsSending||selected.length===0||selected.length>10000||!template.trim()||invalid.length>0||!bulkSmsUser;
-    send.textContent=`Send SMS to ${selected.length.toLocaleString()}`;
+function setBulkSmsBusy(busy){
+  ['bulkSmsReviewButton','bulkSmsSendButton','bulkSmsBackButton','bulkSmsSaveTemplateButton','bulkSmsTemplate','bulkSmsText','bulkSmsMfaButton','bulkSmsSignInButton']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=busy;});
+  document.getElementById('bulkSmsCloseButton').disabled=busy&&bulkSmsSending;
+  if(!busy){renderBulkSmsPreview();if(bulkSmsStep==='review')updateBulkSmsSendButton();}
+}
+/* Any change to who's ticked, the message, or the opt-out list makes a finished review out of date. */
+function invalidateBulkSmsReview(){
+  if(!bulkSmsReviewData)return;
+  bulkSmsReviewData=null;
+  if(bulkSmsStep==='review'&&!bulkSmsSending){
+    showBulkSmsStep('compose');
+    setBulkSmsStatus('The ticked clients or the message changed, so review again before sending.','error');
   }
-  const label=document.getElementById('bulkSmsFooterCount');
-  if(label)label.textContent=`${selected.length.toLocaleString()} selected`;
 }
-function isAustralianMobile(phone){
-  const digits=(phone||'').replace(/\D/g,'');
-  return /^(?:04\d{8}|614\d{8})$/.test(digits);
+function handleBulkSmsError(r){
+  if(r.data&&r.data.code==='mfa_required'){startBulkSmsMfa();setBulkSmsStatus(r.error,'error');return;}
+  if(r.status===401){bulkSmsUser=null;showBulkSmsStep('signin');setBulkSmsStatus(r.error,'error');return;}
+  setBulkSmsStatus(r.error,'error');
 }
-function openBulkSmsModal(){
-  const selected=getSelectedClientLeads();
-  if(!selected.length)return;
-  bulkSmsRequestId=null;
-  bulkSmsSending=false;
-  const select=document.getElementById('bulkSmsTemplate');
-  select.innerHTML=tpls.map((t,i)=>`<option value="${i}">${esc(t.name)}</option>`).join('');
+
+/* ----- Sign in + two-factor ----- */
+async function openBulkSmsModal(){
+  if(!selectedClientIds.size)return;
   document.getElementById('bulkSmsOverlay').classList.add('open');
-  document.getElementById('bulkSmsComposer').classList.remove('hide');
-  document.getElementById('bulkSmsSendButton').classList.remove('hide');
   setBulkSmsStatus('');
-  if(tpls.length)bulkSmsTemplateChanged();
   renderBulkSmsButton();
-  _smsSb.auth.getSession().then(({data,error})=>{
-    if(error){setBulkSmsAuth(null);setBulkSmsStatus('Could not check sign-in status. Please sign in again.','error');return;}
-    setBulkSmsAuth(data.session?.user||null);
-  });
+  await refreshBulkSmsAuth();
 }
 function closeBulkSmsModal(){
   if(bulkSmsSending)return;
   document.getElementById('bulkSmsOverlay').classList.remove('open');
   document.getElementById('bulkSmsPassword').value='';
-  bulkSmsRequestId=null;
+  document.getElementById('bulkSmsMfaCode').value='';
+  bulkSmsStep='';
 }
-function setBulkSmsAuth(user){
-  bulkSmsUser=user||null;
-  document.getElementById('bulkSmsAuthSignedOut').classList.toggle('hide',!!bulkSmsUser);
-  document.getElementById('bulkSmsAuthSignedIn').classList.toggle('hide',!bulkSmsUser);
-  document.getElementById('bulkSmsComposer').classList.remove('hide');
-  document.getElementById('bulkSmsSendButton').classList.remove('hide');
-  document.getElementById('bulkSmsSignedInAs').textContent=bulkSmsUser?`Signed in as ${bulkSmsUser.email||'authorised CRM user'}`:'';
-  document.getElementById('bulkSmsSignInButton').disabled=false;
-  renderBulkSmsPreview();
+async function refreshBulkSmsAuth(){
+  const {data,error}=await _smsSb.auth.getSession();
+  bulkSmsUser=(!error&&data.session)?data.session.user:null;
+  if(!bulkSmsUser){showBulkSmsStep('signin');return;}
+  const aal=await _smsSb.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(!aal.error&&aal.data.currentLevel==='aal2'){await enterBulkSmsComposer();return;}
+  await startBulkSmsMfa();
 }
 async function signInBulkSms(){
   const email=document.getElementById('bulkSmsEmail').value.trim();
   const password=document.getElementById('bulkSmsPassword').value;
-  if(!email||!password){setBulkSmsStatus('Enter your authorised CRM email and password.','error');return;}
-  const button=document.getElementById('bulkSmsSignInButton');
-  button.disabled=true;setBulkSmsStatus('Signing in…');
+  if(!email||!password){setBulkSmsStatus('Enter your email and password.','error');return;}
+  setBulkSmsBusy(true);setBulkSmsStatus('Signing in…');
   try{
-    const {data,error}=await _smsSb.auth.signInWithPassword({email,password});
+    const {error}=await _smsSb.auth.signInWithPassword({email,password});
     if(error)throw error;
     document.getElementById('bulkSmsPassword').value='';
-    setBulkSmsAuth(data.user);
-    setBulkSmsStatus('Signed in. Review the personalised messages, then send when ready.','success');
+    setBulkSmsStatus('');
+    await refreshBulkSmsAuth();
   }catch(e){
-    setBulkSmsStatus(e.message||'Sign-in failed. Check your credentials and try again.','error');
-  }finally{button.disabled=false;}
+    setBulkSmsStatus(e.message||'Sign-in failed. Check your details and try again.','error');
+  }finally{setBulkSmsBusy(false);}
+}
+async function startBulkSmsMfa(){
+  showBulkSmsStep('mfa');
+  const intro=document.getElementById('bulkSmsMfaIntro');
+  const qr=document.getElementById('bulkSmsMfaQr');
+  const secret=document.getElementById('bulkSmsMfaSecret');
+  qr.classList.add('hide');secret.classList.add('hide');qr.removeAttribute('src');
+  bulkSmsMfaFactorId=null;
+  const {data,error}=await _smsSb.auth.mfa.listFactors();
+  if(error){setBulkSmsStatus('Could not check two-factor setup: '+error.message,'error');return;}
+  const verified=(data.totp||[]).find(f=>f.status==='verified');
+  if(verified){
+    bulkSmsMfaFactorId=verified.id;
+    intro.textContent='Enter the 6-digit code from your authenticator app.';
+  }else{
+    for(const f of (data.all||[]).filter(f=>f.factor_type==='totp'&&f.status!=='verified')){
+      await _smsSb.auth.mfa.unenroll({factorId:f.id});
+    }
+    const en=await _smsSb.auth.mfa.enroll({factorType:'totp',friendlyName:'Bulk SMS'});
+    if(en.error){setBulkSmsStatus('Could not start two-factor setup: '+en.error.message,'error');return;}
+    bulkSmsMfaFactorId=en.data.id;
+    intro.textContent='Bulk SMS needs two-factor sign-in. Scan this QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, etc.), then enter the 6-digit code it shows. You only do this once.';
+    qr.src=en.data.totp.qr_code;qr.classList.remove('hide');
+    secret.textContent='Can’t scan it? Type this key into the app instead: '+en.data.totp.secret;
+    secret.classList.remove('hide');
+  }
+  document.getElementById('bulkSmsMfaCode').focus();
+}
+async function verifyBulkSmsMfa(){
+  const input=document.getElementById('bulkSmsMfaCode');
+  const code=input.value.replace(/\s/g,'');
+  if(!/^\d{6}$/.test(code)){setBulkSmsStatus('Enter the 6-digit code from your authenticator app.','error');return;}
+  if(!bulkSmsMfaFactorId){await startBulkSmsMfa();return;}
+  setBulkSmsBusy(true);setBulkSmsStatus('Checking code…');
+  const {error}=await _smsSb.auth.mfa.challengeAndVerify({factorId:bulkSmsMfaFactorId,code});
+  setBulkSmsBusy(false);
+  if(error){setBulkSmsStatus('That code didn’t work. Wait for the next code and try again.','error');return;}
+  input.value='';setBulkSmsStatus('');
+  await enterBulkSmsComposer();
 }
 async function signOutBulkSms(){
-  const {error}=await _smsSb.auth.signOut();
-  setBulkSmsAuth(null);
-  setBulkSmsStatus(error?error.message:'Signed out.','');
+  if(bulkSmsSending)return;
+  await _smsSb.auth.signOut();
+  bulkSmsUser=null;bulkSmsReviewData=null;
+  showBulkSmsStep('signin');
+  setBulkSmsStatus('Signed out.');
 }
-async function saveBulkSmsTemplate(){
-  const i=+document.getElementById('bulkSmsTemplate').value;
-  if(!tpls[i])return;
-  const button=document.getElementById('bulkSmsSaveTemplateButton');
-  button.disabled=true;
-  try{
-    tpls[i].text=document.getElementById('bulkSmsText').value;
-    await saveConfig();
-    setBulkSmsStatus(`Saved changes to “${tpls[i].name}”.`,'success');
-  }catch(e){setBulkSmsStatus('Could not save the template: '+(e.message||'unknown error'),'error');}
-  finally{button.disabled=false;}
+
+/* ----- Compose ----- */
+async function enterBulkSmsComposer(){
+  setBulkSmsStatus('Loading…');
+  const pending=readBulkSmsBatch();
+  if(pending){
+    const s=await callBulkSms('batch.status',{client_batch_key:pending.key});
+    if(!s.ok){handleBulkSmsError(s);return;}
+    if(s.data.status!=='none'&&s.data.status!=='prepared'){showBulkSmsResult(s.data,true);return;}
+  }
+  /* Bulk templates are their own list. On first use they're copied once from the quick-SMS templates;
+     after that, editing one never changes the other. */
+  const t=await callBulkSms('templates.list',{seed_from:tpls.map(x=>({name:x.name,text:x.text}))});
+  if(!t.ok){handleBulkSmsError(t);return;}
+  bulkSmsTemplates=t.data.templates||[];
+  const select=document.getElementById('bulkSmsTemplate');
+  select.innerHTML=bulkSmsTemplates.map((x,i)=>`<option value="${i}">${esc(x.name)}</option>`).join('')||'<option value="-1">Custom message</option>';
+  document.getElementById('bulkSmsSaveTemplateButton').disabled=!bulkSmsTemplates.length;
+  setBulkSmsStatus('');
+  showBulkSmsStep('compose');
+  bulkSmsTemplateChanged();
+  loadBulkSmsOptOuts();
+}
+function selectedBulkSmsTemplate(){return bulkSmsTemplates[+document.getElementById('bulkSmsTemplate').value]||null;}
+function bulkSmsTemplateChanged(){
+  const template=selectedBulkSmsTemplate();
+  const text=document.getElementById('bulkSmsText');
+  if(template)text.value=template.text;
+  document.getElementById('bulkSmsTemplate').title=text.value||'No message yet';
+  invalidateBulkSmsReview();
+  setBulkSmsStatus('');
   renderBulkSmsPreview();
 }
-function newBulkSmsRequestId(){
-  return crypto.randomUUID?crypto.randomUUID():`sms-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function renderBulkSmsPreview(){
+  if(bulkSmsStep!=='compose')return;
+  const loaded=getSelectedClientLeads();
+  const total=selectedClientIds.size;
+  const template=document.getElementById('bulkSmsText').value||'';
+  const preview=loaded.slice(0,5);
+  document.getElementById('bulkSmsPreview').innerHTML=preview.map(l=>{
+    const phone=(l.phone||'').trim()||'No phone number';
+    return `<div class="bulk-sms-preview-item"><strong>${esc(l.name)} · ${esc(phone)}</strong>${esc(personaliseSmsText(l,template))}</div>`;
+  }).join('')||'<div class="bulk-sms-preview-item">Tick clients in the table to preview their messages.</div>';
+  const notes=[];
+  if(loaded.length>preview.length)notes.push(`Showing 5 of ${loaded.length.toLocaleString()}.`);
+  if(total>loaded.length)notes.push(`${(total-loaded.length).toLocaleString()} ticked ${total-loaded.length===1?'client isn’t':'clients aren’t'} loaded on this page; the review will check them.`);
+  notes.push('Review checks every number, merges duplicates and removes opted-out numbers before anything is sent.');
+  document.getElementById('bulkSmsPreviewMore').textContent=notes.join(' ');
+  const review=document.getElementById('bulkSmsReviewButton');
+  review.disabled=bulkSmsSending||total===0||!template.trim();
+  review.textContent=`Review ${total.toLocaleString()}`;
 }
-async function sendBulkSms(){
-  if(bulkSmsSending)return;
-  const selected=getSelectedClientLeads();
-  const templateText=document.getElementById('bulkSmsText').value;
-  if(!bulkSmsUser){setBulkSmsStatus('Sign in with an authorised CRM account before sending.','error');return;}
-  if(!selected.length){setBulkSmsStatus('Select at least one client in the table.','error');return;}
-  const invalid=selected.filter(l=>!isAustralianMobile(l.phone));
-  if(invalid.length){setBulkSmsStatus(`${invalid.length} selected ${invalid.length===1?'client has':'clients have'} no valid Australian mobile number. Update their record or uncheck them before sending.`,'error');return;}
-  if(!templateText.trim()){setBulkSmsStatus('Choose a template or enter a message before sending.','error');return;}
-  if(selected.length>10000){setBulkSmsStatus('MobileMessage accepts up to 10,000 messages per batch. Reduce the selected clients before sending.','error');return;}
-  if(!confirm(`Send ${selected.length.toLocaleString()} personalised SMS messages to the checked clients?`))return;
-  if(!bulkSmsRequestId)bulkSmsRequestId=newBulkSmsRequestId();
-  const template=tpls[+document.getElementById('bulkSmsTemplate').value];
-  const messages=selected.map(l=>({lead_id:String(l.id),to:l.phone.replace(/[\s().-]/g,''),message:personaliseSmsText(l,templateText)}));
-  const send=document.getElementById('bulkSmsSendButton');
-  bulkSmsSending=true;send.disabled=true;
-  document.getElementById('bulkSmsTemplate').disabled=true;
-  document.getElementById('bulkSmsText').disabled=true;
-  document.getElementById('bulkSmsSaveTemplateButton').disabled=true;
-  setBulkSmsStatus(`Sending ${selected.length.toLocaleString()} messages to the secure n8n workflow…`);
-  try{
-    const {data,error}=await _smsSb.functions.invoke('bulk-sms',{body:{request_id:bulkSmsRequestId,template_name:template?.name||'Custom message',messages}});
-    if(error)throw error;
-    if(!data||data.status!=='accepted')throw new Error(data?.error||'The SMS workflow did not confirm the batch.');
-    const sentCount=selected.length;
-    selectedClientIds.clear();persistBulkSmsSelection();renderTable();
-    bulkSmsRequestId=null;
-    closeBulkSmsModal();
-    showToast(`Queued ${sentCount.toLocaleString()} SMS messages`);
-  }catch(e){
-    setBulkSmsStatus(e.message||'The SMS batch could not be sent. Your selections are still saved.','error');
-  }finally{
-    bulkSmsSending=false;
-    document.getElementById('bulkSmsTemplate').disabled=false;
-    document.getElementById('bulkSmsText').disabled=false;
-    document.getElementById('bulkSmsSaveTemplateButton').disabled=false;
-    if(document.getElementById('bulkSmsOverlay').classList.contains('open'))renderBulkSmsButton();
+async function saveBulkSmsTemplate(){
+  const template=selectedBulkSmsTemplate();
+  const text=document.getElementById('bulkSmsText').value;
+  if(!template)return;
+  if(!text.trim()){setBulkSmsStatus('A template can’t be empty.','error');return;}
+  setBulkSmsBusy(true);
+  const r=await callBulkSms('templates.save',{id:template.id,text});
+  setBulkSmsBusy(false);
+  if(!r.ok){handleBulkSmsError(r);return;}
+  template.text=text.trim();
+  setBulkSmsStatus(`Saved “${template.name}” for bulk SMS. Your quick-SMS templates are unchanged.`,'success');
+}
+
+/* ----- Opt-out list ----- */
+async function loadBulkSmsOptOuts(){
+  const r=await callBulkSms('suppressions.list');
+  const list=document.getElementById('bulkSmsOptOutList');
+  if(!r.ok){list.innerHTML=`<div class="bulk-sms-note">${esc(r.error)}</div>`;return;}
+  const rows=r.data.suppressions||[];
+  document.getElementById('bulkSmsOptOutSummary').textContent=`Opt-out list (${rows.length.toLocaleString()})`;
+  list.innerHTML=rows.map(x=>`<div class="bulk-sms-optout"><span>${esc(fmtMobile(x.canonical_number))}</span><button class="tbtn" onclick="removeBulkSmsOptOut('${esc(x.canonical_number)}')">Remove</button></div>`).join('')
+    ||'<div class="bulk-sms-note">No opted-out numbers yet.</div>';
+}
+async function addBulkSmsOptOut(){
+  const input=document.getElementById('bulkSmsOptOutNumber');
+  const r=await callBulkSms('suppressions.add',{number:input.value});
+  if(!r.ok){handleBulkSmsError(r);return;}
+  input.value='';
+  invalidateBulkSmsReview();
+  setBulkSmsStatus(`${fmtMobile(r.data.canonical_number)} won’t be bulk-texted.`,'success');
+  loadBulkSmsOptOuts();
+}
+async function removeBulkSmsOptOut(number){
+  if(!confirm(`Allow bulk texts to ${fmtMobile(number)} again?`))return;
+  const r=await callBulkSms('suppressions.remove',{number});
+  if(!r.ok){handleBulkSmsError(r);return;}
+  invalidateBulkSmsReview();
+  loadBulkSmsOptOuts();
+}
+
+/* ----- Review ----- */
+async function reviewBulkSms(){
+  const leadIds=[...selectedClientIds];
+  const text=document.getElementById('bulkSmsText').value;
+  const template=selectedBulkSmsTemplate();
+  if(!leadIds.length||!text.trim())return;
+  const request={lead_ids:leadIds,template_text:text,template_id:template?.id||null,template_name:template&&template.text===text?template.name:'Custom message'};
+  const key=readBulkSmsBatch()?.key||newBulkSmsKey();
+  writeBulkSmsBatch({key});
+  setBulkSmsBusy(true);setBulkSmsStatus(`Checking ${leadIds.length.toLocaleString()} ticked clients…`);
+  let r=await callBulkSms('prepare',{client_batch_key:key,...request});
+  if(!r.ok&&r.data&&r.data.code==='batch_used'){
+    const fresh=newBulkSmsKey();writeBulkSmsBatch({key:fresh});
+    r=await callBulkSms('prepare',{client_batch_key:fresh,...request});
   }
+  setBulkSmsBusy(false);
+  if(!r.ok){handleBulkSmsError(r);return;}
+  bulkSmsReviewData={...r.data,...request,key:readBulkSmsBatch().key,choices:{}};
+  setBulkSmsStatus('');
+  renderBulkSmsReview();
+  showBulkSmsStep('review');
+  updateBulkSmsSendButton();
+}
+function renderBulkSmsReview(){
+  const d=bulkSmsReviewData;
+  const merged=d.recipients.filter(r=>r.lead_ids.length>1).length;
+  let html=`<div class="bulk-sms-summary">${d.selected_count.toLocaleString()} ticked → ${d.recipient_count.toLocaleString()} ${d.recipient_count===1?'text':'texts'} will be sent</div>`;
+  const why=[];
+  if(merged)why.push(`${merged.toLocaleString()} ${merged===1?'number is':'numbers are'} shared by more than one client and ${merged===1?'gets':'get'} one text`);
+  if(d.suppressed.length)why.push(`${d.suppressed.length.toLocaleString()} opted out`);
+  if(d.invalid.length)why.push(`${d.invalid.length.toLocaleString()} ${d.invalid.length===1?'needs':'need'} fixing`);
+  if(why.length)html+=`<div class="bulk-sms-note">${esc(why.join(' · '))}</div>`;
+  if(d.invalid.length){
+    html+=`<div class="bulk-sms-section bad"><h4>Can’t send until these are fixed or unticked</h4><ul>${
+      d.invalid.map(x=>`<li><b>${esc(x.name)}</b> — ${esc(x.reason)}</li>`).join('')
+    }</ul><div class="bulk-sms-note">Fix the number in the client’s record, or untick them.</div>
+    <button class="tbtn" style="margin-top:6px" onclick="untickInvalidBulkSms()">Untick these ${d.invalid.length.toLocaleString()} and review again</button></div>`;
+  }
+  if(d.suppressed.length){
+    html+=`<div class="bulk-sms-section warn"><h4>Opted out — won’t be texted</h4><ul>${
+      d.suppressed.map(x=>`<li>${esc(x.name)} · ${esc(fmtMobile(x.canonical_number))}</li>`).join('')
+    }</ul></div>`;
+  }
+  if(d.conflicts.length){
+    html+=`<div class="bulk-sms-section warn"><h4>Shared numbers with different messages — pick one each</h4>`;
+    d.conflicts.forEach((c,ci)=>{
+      html+=`<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:700">${esc(fmtMobile(c.canonical_number))} · ${esc(c.names.join(', '))}</div>${
+        c.messages.map((m,mi)=>`<label class="bulk-sms-choice"><input type="radio" name="bulkSmsConflict${ci}" onchange="chooseBulkSmsConflict(${ci},${mi})">${esc(m)}</label>`).join('')
+      }</div>`;
+    });
+    html+=`</div>`;
+  }
+  const shown=d.recipients.slice(0,200);
+  html+=`<div class="bulk-sms-section"><h4>Exact messages${d.recipients.length>shown.length?` (first ${shown.length} of ${d.recipients.length.toLocaleString()})`:''}</h4><div class="bulk-sms-preview">${
+    shown.map(r=>{
+      const conflict=d.conflicts.find(c=>c.canonical_number===r.canonical_number);
+      const msg=conflict?(d.choices[r.canonical_number]||'(pick a message above)'):r.message;
+      return `<div class="bulk-sms-preview-item"><strong>${esc(r.names.join(', '))} · ${esc(fmtMobile(r.canonical_number))}</strong>${esc(msg)}</div>`;
+    }).join('')||'<div class="bulk-sms-preview-item">No one left to text.</div>'
+  }</div></div>`;
+  document.getElementById('bulkSmsReview').innerHTML=html;
+}
+function chooseBulkSmsConflict(ci,mi){
+  const c=bulkSmsReviewData.conflicts[ci];
+  bulkSmsReviewData.choices[c.canonical_number]=c.messages[mi];
+  renderBulkSmsReview();
+  document.querySelectorAll(`input[name="bulkSmsConflict${ci}"]`)[mi].checked=true;
+  Object.entries(bulkSmsReviewData.choices).forEach(([n,m])=>{
+    const i=bulkSmsReviewData.conflicts.findIndex(x=>x.canonical_number===n);
+    const j=i>=0?bulkSmsReviewData.conflicts[i].messages.indexOf(m):-1;
+    if(j>=0)document.querySelectorAll(`input[name="bulkSmsConflict${i}"]`)[j].checked=true;
+  });
+  updateBulkSmsSendButton();
+}
+function updateBulkSmsSendButton(){
+  const d=bulkSmsReviewData;
+  const send=document.getElementById('bulkSmsSendButton');
+  if(!d){send.disabled=true;return;}
+  const unresolved=d.conflicts.some(c=>!d.choices[c.canonical_number]);
+  send.disabled=bulkSmsSending||d.invalid.length>0||unresolved||d.recipient_count===0;
+  send.textContent=`Send ${d.recipient_count.toLocaleString()} ${d.recipient_count===1?'text':'texts'}`;
+}
+function untickInvalidBulkSms(){
+  bulkSmsReviewData.invalid.forEach(x=>selectedClientIds.delete(String(x.lead_id)));
+  persistBulkSmsSelection();
+  bulkSmsReviewData=null;
+  renderTable();
+  reviewBulkSms();
+}
+function backToBulkSmsComposer(){
+  bulkSmsReviewData=null;
+  setBulkSmsStatus('');
+  showBulkSmsStep('compose');
+}
+
+/* ----- Send + result ----- */
+async function sendBulkSms(){
+  const d=bulkSmsReviewData;
+  if(bulkSmsSending||!d)return;
+  if(!confirm(`Send ${d.recipient_count.toLocaleString()} ${d.recipient_count===1?'text':'texts'} now? This can’t be undone.`))return;
+  bulkSmsSending=true;setBulkSmsBusy(true);
+  setBulkSmsStatus('Sending through MobileMessage… keep this window open.');
+  const r=await callBulkSms('submit',{
+    client_batch_key:d.key,lead_ids:d.lead_ids,template_text:d.template_text,template_id:d.template_id,
+    template_name:d.template_name,payload_hash:d.payload_hash,conflict_choices:d.choices,
+  });
+  bulkSmsSending=false;setBulkSmsBusy(false);
+  if(r.data&&r.data.batch_id){showBulkSmsResult(r.data);return;}
+  if(r.data&&['stale_review','invalid_recipients','conflict_unresolved'].includes(r.data.code)){
+    bulkSmsReviewData=null;showBulkSmsStep('compose');setBulkSmsStatus(r.error,'error');return;
+  }
+  // No clear answer: ask the server what actually happened before offering anything else.
+  const s=await callBulkSms('batch.status',{client_batch_key:d.key});
+  if(s.ok&&s.data.status!=='none'&&s.data.status!=='prepared'){showBulkSmsResult(s.data);return;}
+  if(s.ok){setBulkSmsStatus(r.error+' Nothing was sent, so it’s safe to try again.','error');return;}
+  showBulkSmsUnconfirmed(d.key);
+}
+function showBulkSmsUnconfirmed(key){
+  showBulkSmsStep('result');
+  document.getElementById('bulkSmsResult').innerHTML=`<div class="bulk-sms-section warn"><h4>Couldn’t confirm what happened</h4>
+    <div class="bulk-sms-note">The connection dropped while sending. Don’t send again yet: check the result first. Your ticks haven’t changed.</div>
+    <button class="tbtn" style="margin-top:8px" onclick="recheckBulkSms('${esc(key)}')">Check again</button></div>`;
+  setBulkSmsStatus('');
+}
+async function recheckBulkSms(key){
+  setBulkSmsStatus('Checking…');
+  const s=await callBulkSms('batch.status',{client_batch_key:key});
+  if(!s.ok){handleBulkSmsError(s);return;}
+  if(s.data.status==='none'||s.data.status==='prepared'){
+    setBulkSmsStatus('Nothing was sent. You can review and send again.','success');
+    await enterBulkSmsComposer();return;
+  }
+  showBulkSmsResult(s.data);
+}
+function nameForLeadId(id){const l=leads.find(x=>String(x.id)===String(id));return l?l.name:id;}
+function showBulkSmsResult(o,recovered=false){
+  (o.accepted_lead_ids||[]).forEach(id=>selectedClientIds.delete(String(id)));
+  persistBulkSmsSelection();
+  renderTable();
+  const stillRunning=o.status==='submitting';
+  if(!stillRunning)writeBulkSmsBatch(null);
+  bulkSmsReviewData=null;
+  const who=r=>`${esc(r.lead_ids.map(nameForLeadId).join(', '))} · ${esc(fmtMobile(r.canonical_number))}`;
+  let html=recovered?`<div class="bulk-sms-note" style="margin-bottom:8px">Result of your last bulk send${o.template_name?` (“${esc(o.template_name)}”)`:''}:</div>`:'';
+  html+=`<div class="bulk-sms-section good"><h4>✅ ${(o.accepted_count||0).toLocaleString()} of ${(o.recipient_count||0).toLocaleString()} accepted by MobileMessage</h4>
+    <div class="bulk-sms-note">Accepted means MobileMessage has queued them for delivery. Those clients have been unticked. n8n also sends a summary to your Telegram.</div></div>`;
+  if(o.confirmed_failed&&o.confirmed_failed.length){
+    html+=`<div class="bulk-sms-section bad"><h4>❌ ${o.confirmed_failed.length.toLocaleString()} rejected by MobileMessage</h4><ul>${
+      o.confirmed_failed.map(r=>`<li>${who(r)}</li>`).join('')}</ul><div class="bulk-sms-note">These weren’t sent and are still ticked, so you can check the numbers and try again.</div></div>`;
+  }
+  if(o.unknown&&o.unknown.length){
+    html+=`<div class="bulk-sms-section warn"><h4>⚠️ ${o.unknown.length.toLocaleString()} not confirmed</h4><ul>${
+      o.unknown.map(r=>`<li>${who(r)}</li>`).join('')}</ul><div class="bulk-sms-note">These may or may not have gone out. They’re still ticked but won’t be resent automatically: check your MobileMessage dashboard before sending to them again, or you could text them twice.</div>${
+      stillRunning?`<button class="tbtn" style="margin-top:6px" onclick="recheckBulkSms('${esc(readBulkSmsBatch()?.key||'')}')">Check again</button>`:''}</div>`;
+  }
+  document.getElementById('bulkSmsResult').innerHTML=html;
+  showBulkSmsStep('result');
+  setBulkSmsStatus(o.error||'',o.error?'error':'');
+  if(o.accepted_count)showToast(`${o.accepted_count.toLocaleString()} texts accepted by MobileMessage`);
 }
 function quickSms(id){
   const l=leads.find(x=>x.id===id);
