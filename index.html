@@ -2391,8 +2391,8 @@ function showBulkSmsResult(o,recovered=false){
   bulkSmsReviewData=null;
   const who=r=>`${esc(r.lead_ids.map(nameForLeadId).join(', '))} · ${esc(fmtMobile(r.canonical_number))}`;
   let html=recovered?`<div class="bulk-sms-note" style="margin-bottom:8px">Result of your last bulk send${o.template_name?` (“${esc(o.template_name)}”)`:''}:</div>`:'';
-  html+=`<div class="bulk-sms-section good"><h4>✅ ${(o.accepted_count||0).toLocaleString()} of ${(o.recipient_count||0).toLocaleString()} accepted by MobileMessage</h4>
-    <div class="bulk-sms-note">Accepted means MobileMessage has queued them for delivery. Those clients have been unticked. n8n also sends a summary to your Telegram.</div></div>`;
+  html+=`<div class="bulk-sms-section ${o.accepted_count?'good':'bad'}"><h4>${o.accepted_count?'✅':'❌'} ${(o.accepted_count||0).toLocaleString()} of ${(o.recipient_count||0).toLocaleString()} accepted by MobileMessage</h4>${
+    o.accepted_count?'<div class="bulk-sms-note">Accepted means MobileMessage has queued them for delivery. Those clients have been unticked. A summary also goes to your Telegram.</div>':''}</div>`;
   if(o.confirmed_failed&&o.confirmed_failed.length){
     html+=`<div class="bulk-sms-section bad"><h4>❌ ${o.confirmed_failed.length.toLocaleString()} rejected by MobileMessage</h4><ul>${
       o.confirmed_failed.map(r=>`<li>${who(r)}</li>`).join('')}</ul><div class="bulk-sms-note">These weren’t sent and are still ticked, so you can check the numbers and try again.</div></div>`;

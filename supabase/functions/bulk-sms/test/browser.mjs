@@ -83,7 +83,7 @@ function smsClient(){
         async getAuthenticatorAssuranceLevel(){return{data:{currentLevel:load().aal},error:null}},
         async listFactors(){const f=load().factor?[load().factor]:[];return{data:{all:f,totp:f.filter(x=>x.status==='verified')},error:null}},
         async unenroll({factorId}){const s=load();if(s.factor&&s.factor.id===factorId){s.factor=null;save(s);}return{error:null}},
-        async enroll(){const s=load();s.factor={id:'f1',factor_type:'totp',status:'unverified'};save(s);return{data:{id:'f1',totp:{qr_code:'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>',secret:'JBSWY3DPEHPK3PXP'}},error:null}},
+        async enroll(){const s=load();s.factor={id:'f1',factor_type:'totp',status:'unverified'};save(s);return{data:{id:'f1',totp:{qr_code:window.__qrCode||'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>',secret:'JBSWY3DPEHPK3PXP'}},error:null}},
         async challengeAndVerify({code}){const s=load();if(code!=='123456')return{error:{message:'Invalid TOTP code'}};s.factor.status='verified';s.aal='aal2';save(s);return{data:{},error:null}},
       }
     },
@@ -100,7 +100,7 @@ const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(e.message));
 page.on("dialog", (d) => d.accept());
 await page.exposeFunction("__invokeBulkSms", invoke);
-await page.addInitScript((fx) => { window.__fixtures = fx; }, pageFixtures);
+await page.addInitScript(([fx, qr]) => { window.__fixtures = fx; window.__qrCode = qr; }, [pageFixtures, process.env.QR_DATA_URL || null]);
 await page.route("**/*", (route) => {
   const url = route.request().url();
   if (url.startsWith("https://kingazzal69.github.io/rapid-oven-crm/")) return route.fulfill({ contentType: "text/html", body: indexHtml });
@@ -150,12 +150,14 @@ await step("ticks survive paging, searching and reloads; header box only affects
   await page.waitForFunction(() => typeof leads !== "undefined" && leads.length > 200);
   await page.click("#nav-clients");
   assert.equal(await count(), "3 selected");
+  if (process.env.SCREENSHOTS) await page.screenshot({ path: join(process.env.SCREENSHOTS, "0-clients.png") });
   assert.deepEqual(await selected(), ["H1", "X1", onPage2].sort());
 });
 
 await step("sign-in then two-factor setup are required before the composer", async () => {
   await openModal();
   assert.ok(await visible("#bulkSmsSignIn"));
+  await shot("1-sign-in");
   assert.ok(!(await visible("#bulkSmsComposer")));
   await page.fill("#bulkSmsEmail", "aaron@example.com");
   await page.fill("#bulkSmsPassword", "wrong");
@@ -167,7 +169,7 @@ await step("sign-in then two-factor setup are required before the composer", asy
   await page.waitForTimeout(200);
   assert.ok(await visible("#bulkSmsMfa"));
   assert.ok(await visible("#bulkSmsMfaQr"), "first time: QR code shown for setup");
-  await shot("1-two-factor");
+  await shot("2-two-factor");
   assert.ok(!(await visible("#bulkSmsComposer")));
   await page.fill("#bulkSmsMfaCode", "000000");
   await page.click("#bulkSmsMfaButton");
@@ -185,6 +187,8 @@ await step("saving a bulk template leaves quick-SMS templates and config untouch
   const before = await page.evaluate(() => JSON.stringify(tpls));
   await page.selectOption("#bulkSmsTemplate", "0");
   await page.fill("#bulkSmsText", "Hi {name}, Brenna here from Rapid Oven Cleaning. Special this month!");
+  await page.waitForTimeout(50);
+  await shot("3-compose");
   await page.click("#bulkSmsSaveTemplateButton");
   await settle();
   assert.match(await status(), /quick-SMS templates are unchanged/);
@@ -218,7 +222,7 @@ await step("review lists problems, opted-out, shared numbers; send stays blocked
   assert.match(review, /Opted out[\s\S]*Opt Out Person/);
   assert.match(review, /Shared numbers[\s\S]*Bowman, Trudy, Sam Lee/);
   assert.ok(await page.locator("#bulkSmsSendButton").isDisabled());
-  await shot("2-review");
+  await shot("4-review");
   assert.equal(await page.evaluate(() => window.__xss), undefined, "names are escaped, not run as HTML");
   assert.match(review, /<img src=x onerror="window.__xss=1">/, "the odd name is shown as plain text");
 });
@@ -252,7 +256,7 @@ await step("send goes out once, shows the result on screen, unticks only who was
   assert.match(await page.locator("#bulkSmsResult").innerText(), /4 of 4 accepted by MobileMessage/);
   assert.deepEqual(await selected(), ["X5"], "only the opted-out client is still ticked");
   assert.equal(await page.locator("#bulkSmsCloseButton").innerText(), "Close");
-  await shot("3-result");
+  await shot("5-result");
   await page.click("#bulkSmsCloseButton");
   assert.ok(!(await page.locator("#bulkSmsOverlay").evaluate((e) => e.classList.contains("open"))), "window closes after a send");
 });

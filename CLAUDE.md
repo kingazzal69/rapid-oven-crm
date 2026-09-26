@@ -28,11 +28,14 @@ Single-file CRM (`index.html`) for Rapid Oven Cleaning (Sydney oven/BBQ cleaning
 
 ## SMS follow-up templates
 
-- `tpls` array (near the top of the `<script>` block) provides default SMS templates with `{name}`/`{service}`/`{value}`/`{suburb}`/`{address}`/`{jobwhen}` placeholders. Supabase `config.data.tpls` overrides the defaults when present. Templates can be edited in the lead modal's Follow-up section and the Bulk SMS composer.
+- `tpls` array (near the top of the `<script>` block) provides default SMS templates with `{name}`/`{service}`/`{value}`/`{suburb}`/`{address}`/`{jobwhen}` placeholders. Supabase `config.data.tpls` overrides the defaults when present. Templates can be edited in the lead modal's Follow-up section. (Bulk SMS has its own separate template list — see below.)
 - `pickTplForStage(stage)` maps pipeline stage → template index for the **quick-SMS 💬 button** that sits on every Pipeline card (opens the phone's native SMS app via an `sms:` URI with the message pre-filled). Keep this mapping in sync if templates are added/reordered.
 - Business voice: texts are signed from "Brenna" at Rapid Oven Cleaning — casual, short, no corporate tone.
-- Bulk SMS lives in the Clients Database toolbar. It keeps row selections across pages and filters in `sessionStorage`, then personalises the chosen template for each checked client.
-- Bulk sends go through `supabase/functions/bulk-sms/index.ts`, which verifies Supabase Auth and the `SMS_ALLOWED_EMAILS` allowlist before forwarding to the protected n8n webhook. MobileMessage API credentials belong in n8n, never in the static page. See `supabase/functions/bulk-sms/SETUP.md` for deployment and workflow setup.
+- **Bulk SMS** (Clients Database toolbar, next to "All stages"): texts only the ticked clients. Ticks persist across pages/filters in `sessionStorage` (`selectedClientIds`). Flow: sign in → two-factor code → compose → server **review** → send once → result on screen + Telegram summary. Full setup/testing/rollback: `supabase/functions/bulk-sms/SETUP.md`.
+- The server side (`supabase/functions/bulk-sms/index.ts`) is the authority: it requires the `SMS_ALLOWED_EMAILS` account *with* two-factor (`aal2`), re-reads numbers from `leads`, merges duplicates per canonical `614XXXXXXXX` number, drops opted-out numbers (`bulk_sms_suppressions`), and claims each batch atomically so it can never send twice. Its `personalise()` must stay identical to `personaliseSmsText()`/`firstNameOf()` in `index.html` (a test checks this).
+- Bulk templates live in `bulk_sms_templates` (seeded once from `tpls`), separate from quick-SMS `tpls`/`config` — bulk edits must never write to `config`. Bulk SMS tables (`supabase/migrations/0001_bulk_sms.sql`) grant nothing to anon; only the function can reach them.
+- Sending goes via the n8n workflow **"Rapid Oven – Bulk SMS (MobileMessage)"** (id `aRcdRb22RQCmPK5C`, source `n8n/rapid-oven-bulk-sms.workflow.ts`), separate from every other workflow. MobileMessage/Telegram credentials live in n8n only, never in the page.
+- Tests (no network, no real SMS): `node supabase/functions/bulk-sms/test/run.mjs`, `.../workflow.mjs`, and `.../browser.mjs` (needs Playwright).
 
 ## Integrations this CRM depends on (external, not in this repo)
 

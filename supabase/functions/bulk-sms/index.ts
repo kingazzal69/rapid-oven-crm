@@ -426,6 +426,13 @@ Deno.serve(async (request) => {
           }),
           signal: controller.signal,
         });
+        // n8n answers 404 when the workflow is switched off: it never ran, so nothing was sent.
+        if (upstream.status === 404) {
+          const now = new Date().toISOString();
+          await db.from("bulk_sms_recipients").update({ status: "confirmed_failed", updated_at: now }).eq("batch_id", claimed.id);
+          await db.from("bulk_sms_batches").update({ status: "confirmed_failed", resolved_at: now }).eq("id", claimed.id);
+          return reply({ ...(await batchOutcome(db, { ...claimed, status: "confirmed_failed" })), error: "The SMS workflow is switched off in n8n, so nothing was sent. Everyone is still ticked." });
+        }
         const body = await upstream.json().catch(() => null);
         if (!upstream.ok || !body || !Array.isArray(body.results)) {
           console.error("n8n SMS workflow returned an unusable response", upstream.status);

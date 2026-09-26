@@ -62,6 +62,7 @@ function stubProvider(mode = "accept") {
     const m = provider.mode;
     if (m === "throw") throw Object.assign(new Error("aborted"), { name: "AbortError" });
     if (m === "500") return new Response("oops", { status: 500 });
+    if (m === "404") return new Response(JSON.stringify({ message: "webhook not registered" }), { status: 404 });
     if (m === "malformed") return new Response(JSON.stringify({ ok: true }), { status: 200 });
     const results = body.messages.map((msg, i) => {
       if (m === "mixed") return i === 0 ? { operation_id: msg.operation_id, status: "accepted", provider_message_id: "mm1" } : i === 1 ? { operation_id: msg.operation_id, status: "confirmed_failed" } : null;
@@ -239,6 +240,20 @@ for (const mode of ["malformed", "500", "throw"]) {
     assert.equal(status.body.status, "unknown");
   });
 }
+
+test("workflow switched off (404): nothing sent, everyone rejected and still retryable", async () => {
+  fresh();
+  provider.mode = "404";
+  const p = (await call("prepare", req("k1", ["L3", "L8"]))).body;
+  const r = await call("submit", { ...req("k1", ["L3", "L8"]), payload_hash: p.payload_hash });
+  assert.equal(r.body.status, "confirmed_failed");
+  assert.equal(r.body.confirmed_failed.length, 2);
+  assert.deepEqual(r.body.accepted_lead_ids, []);
+  assert.match(r.body.error, /switched off/);
+  provider.mode = "accept";
+  const again = (await call("prepare", req("k2", ["L3", "L8"]))).body;
+  assert.equal((await call("submit", { ...req("k2", ["L3", "L8"]), payload_hash: again.payload_hash })).body.status, "accepted");
+});
 
 test("results for operations outside this batch are ignored", async () => {
   const db = fresh();
