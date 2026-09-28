@@ -219,6 +219,10 @@
   /* Job Count: per-staff slot grid inside an expanded day */
   .jcgrid-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;width:0;min-width:100%;contain:inline-size}
   .jcgridbar{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .jchead.off{color:#9ca3af}
+  .jccard.off{background:#f6f7f9;box-shadow:none}
+  .jccard.off .jccard-h{color:#9ca3af;margin-bottom:0}
+  .jccard.off .jcboxes{margin-top:8px}
   .jcarrows{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:8px}
   .jcarrows small{font-size:12px;font-weight:700;color:var(--muted);margin-right:2px}
   .jcarrow{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:22px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;padding:0 0 3px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
@@ -1814,31 +1818,48 @@ const jcHasStaff=jobs=>(jobs||[]).some(j=>'staff' in j);
 // Daily capacity (jobs a day) per staff member, keyed by first name, in display order. These staff always show, even with no bookings.
 // Free = capacity - jobs booked. Anyone else with a booking uses the 6 standard slots as their capacity.
 const JC_STAFF_CAP={aaron:6,jackson:3,paras:4,kapil:5,bhuwan:5};
+// Weekly roster by day (0=Sun … 6=Sat), first names. Staff not rostered show as Off: no capacity, no free slots.
+const JC_ALL=Object.keys(JC_STAFF_CAP);
+const JC_ROSTER=[
+  ['aaron','kapil','paras'],   // Sun
+  ['aaron','jackson','bhuwan'],// Mon
+  JC_ALL,                      // Tue
+  ['aaron','jackson','bhuwan'],// Wed
+  JC_ALL,                      // Thu
+  JC_ALL,                      // Fri
+  ['aaron','kapil','paras'],   // Sat
+];
 const jcFirst=n=>n.trim().split(/\s+/)[0].toLowerCase();
-function jcCapOf(name){return name==='Unassigned'?0:(JC_STAFF_CAP[jcFirst(name)]??JC_SLOTS.length);}
+function jcOn(name,date){const k=jcFirst(name);return !(k in JC_STAFF_CAP)||JC_ROSTER[new Date(date+'T00:00:00').getDay()].includes(k);}
+function jcCapOf(name,date){return name==='Unassigned'||!jcOn(name,date)?0:(JC_STAFF_CAP[jcFirst(name)]??JC_SLOTS.length);}
 function jcRosterNames(){
   // Full ServiceM8 names come from any job in the 3-week window; a staff member with none yet shows by first name.
   const full=new Map();
   jcRows.forEach(r=>(r.jobs||[]).forEach(j=>{const n=jcWho(j),k=jcFirst(n);if(k in JC_STAFF_CAP&&!full.has(k))full.set(k,n);}));
-  return Object.keys(JC_STAFF_CAP).map(k=>full.get(k)||k[0].toUpperCase()+k.slice(1));
+  return JC_ALL.map(k=>full.get(k)||k[0].toUpperCase()+k.slice(1));
 }
-function jcStaffNames(jobs){
+// Order: staff working that day, then anyone else with a booking, then Unassigned, then staff who are off.
+function jcStaffNames(jobs,date){
   const roster=jcRosterNames(),keys=new Set(roster.map(jcFirst));
   const others=[...new Set(jobs.map(jcWho))].filter(n=>!keys.has(jcFirst(n))).sort((a,b)=>(a==='Unassigned')-(b==='Unassigned')||a.localeCompare(b));
-  return [...roster,...others];
+  return [...roster.filter(n=>jcOn(n,date)),...others,...roster.filter(n=>!jcOn(n,date))];
 }
 function jcInSlot(jobs,name,slot){return jobs.filter(j=>jcWho(j)===name&&jcSlotOf(j.time)===slot).sort((a,b)=>(a.time||'')<(b.time||'')?-1:1);}
 // Which standard slots to mark Free: the earliest slots with no job near them, as many as capacity minus jobs booked.
-function jcFreeSlotIdx(jobs,name){
+function jcFreeSlotIdx(jobs,name,date){
   const booked=jobs.filter(j=>jcWho(j)===name).length;
-  const room=Math.max(0,jcCapOf(name)-booked);
+  const room=Math.max(0,jcCapOf(name,date)-booked);
   return JC_SLOTS.map((_,i)=>i).filter(i=>!jcInSlot(jobs,name,i).length).slice(0,room);
 }
-function jcFreeSlots(jobs,name){return jcFreeSlotIdx(jobs,name).length;}
-// Day totals are overall: every job booked that day (unassigned included) against the team's combined daily capacity.
-const JC_DAY_CAP=Object.values(JC_STAFF_CAP).reduce((a,b)=>a+b,0);
-function jcDayFree(jobs){return Math.max(0,JC_DAY_CAP-jobs.length);}
-function jcBookedLine(jobs,name){const n=jobs.filter(j=>jcWho(j)===name).length;return name==='Unassigned'?n+' booked':`${n}/${jcCapOf(name)} booked · ${jcFreeSlots(jobs,name)} free`;}
+// Day totals are overall: every job booked that day (unassigned included) against the combined capacity of the staff rostered on.
+function jcDayCap(date){return JC_ROSTER[new Date(date+'T00:00:00').getDay()].reduce((a,k)=>a+JC_STAFF_CAP[k],0);}
+function jcDayFree(jobs,date){return Math.max(0,jcDayCap(date)-jobs.length);}
+function jcBookedLine(jobs,name,date){
+  const n=jobs.filter(j=>jcWho(j)===name).length;
+  if(name==='Unassigned')return n+' booked';
+  if(!jcOn(name,date))return 'Off'+(n?` · ${n} booked`:'');
+  return `${n}/${jcCapOf(name,date)} booked · ${jcFreeSlotIdx(jobs,name,date).length} free`;
+}
 function jcJobChip(j){
   return `<div class="jcjob${j.status==='Quote'?' q':''}" onclick="this.classList.toggle('open')">
       <div class="t">${esc(fmtTime12(j.time))||'No time'}</div>
@@ -1848,12 +1869,12 @@ function jcJobChip(j){
 }
 const JC_LEGEND='<div class="jclegend"><span><i class="q"></i>Quote</span><span><i></i>Work Order</span><span><i class="f"></i>Free</span><span>Tap a job for details</span></div>';
 /* Slot grid (shown when a Daily Breakdown row is expanded): column per staff member, row per slot. */
-function jcStaffGrid(jobs){
-  const names=jcStaffNames(jobs);
+function jcStaffGrid(jobs,date){
+  const names=jcStaffNames(jobs,date);
   const slots=JC_SLOTS.map((_,i)=>i);
   if(jobs.some(j=>jcSlotOf(j.time)<0))slots.push(-1);
-  const head=names.map(n=>`<div class="jchead">${esc(n)}<small>${jcBookedLine(jobs,n)}</small></div>`).join('');
-  const free=new Map(names.map(n=>[n,jcFreeSlotIdx(jobs,n)]));
+  const head=names.map(n=>`<div class="jchead${jcOn(n,date)?'':' off'}">${esc(n)}<small>${jcBookedLine(jobs,n,date)}</small></div>`).join('');
+  const free=new Map(names.map(n=>[n,jcFreeSlotIdx(jobs,n,date)]));
   const body=slots.map(s=>`<div class="jcslot">${s<0?'No time':JC_SLOT_LABELS[s]}</div>`
     +names.map(n=>{
       const here=jcInSlot(jobs,n,s);
@@ -1886,18 +1907,19 @@ function renderJcSchedule(){
   wrap.classList.remove('hide');
   if(!days.some(r=>r.date===jcSelDay))jcSelDay=days[0].date;
   document.getElementById('jcStrip').innerHTML=days.map(r=>{
-    const jobs=r.jobs||[],free=jcDayFree(jobs);
+    const jobs=r.jobs||[],free=jcDayFree(jobs,r.date);
     const note=free?free+' free':'Full';
     return `<button class="jcdchip${r.date===jcSelDay?' on':''}" onclick="jcPickDay('${r.date}')"><div class="dd">${jcDayAbbr(r.date)}</div><div class="dn">${+r.date.slice(8)}</div><div class="df${free?'':' none'}">${note}</div></button>`;
   }).join('');
   const day=days.find(r=>r.date===jcSelDay),jobs=day.jobs||[];
-  const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length}/${JC_DAY_CAP} booked · ${jcDayFree(jobs)} free</small></div>`;
-  const cards=jcStaffNames(jobs).map(n=>{
+  const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length}/${jcDayCap(day.date)} booked · ${jcDayFree(jobs,day.date)} free</small></div>`;
+  const cards=jcStaffNames(jobs,day.date).map(n=>{
     // Every job gets its own box at its real time (no cap); Free boxes are the earliest open standard slots, up to their daily capacity.
-    const mine=jobs.filter(j=>jcWho(j)===n);
+    const mine=jobs.filter(j=>jcWho(j)===n),off=!jcOn(n,day.date);
     const items=mine.map(j=>({mins:jcMins(j.time),html:'<div class="jcbox">'+jcJobChip(j)+'</div>'}));
-    jcFreeSlotIdx(jobs,n).forEach(i=>items.push({mins:JC_SLOTS[i],html:`<div class="jcbox"><div class="jcfree slot"><span>${JC_SLOT_LABELS[i]}</span>Free</div></div>`}));    const boxes=items.sort((a,b)=>a.mins-b.mins).map(x=>x.html).join('');
-    return `<div class="jccard"><div class="jccard-h">${esc(n)}<small>${jcBookedLine(jobs,n)}</small></div><div class="jcboxes">${boxes}</div></div>`;
+    jcFreeSlotIdx(jobs,n,day.date).forEach(i=>items.push({mins:JC_SLOTS[i],html:`<div class="jcbox"><div class="jcfree slot"><span>${JC_SLOT_LABELS[i]}</span>Free</div></div>`}));
+    const boxes=items.sort((a,b)=>a.mins-b.mins).map(x=>x.html).join('');
+    return `<div class="jccard${off?' off':''}"><div class="jccard-h">${esc(n)}<small>${jcBookedLine(jobs,n,day.date)}</small></div>${boxes?`<div class="jcboxes">${boxes}</div>`:''}</div>`;
   }).join('');
   document.getElementById('jcCards').innerHTML=title+JC_LEGEND+`<div class="jccards">${cards}</div>`;
 }
@@ -1980,7 +2002,7 @@ async function renderJobCount(){
     const jobs=r.jobs||[];
     const rowBg=r.date===t?'background:#fdf7f3':'';
     // Once the sync tags jobs with their ServiceM8 staff member, every day (even an empty one) shows the per-staff slot grid; otherwise the plain list.
-    const detail=staffMode?jcStaffGrid(jobs)
+    const detail=staffMode?jcStaffGrid(jobs,r.date)
       :!jobs.length?'<div style="color:var(--muted);padding:6px 0">No job details available</div>'
       :jobs.map(j=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">
           <span style="font-weight:600">${esc(fmtTime12(j.time))}</span>
