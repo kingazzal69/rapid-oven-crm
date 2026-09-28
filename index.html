@@ -217,11 +217,17 @@
   .scell .calev{cursor:pointer}
 
   /* Job Count: per-staff slot grid inside an expanded day */
-  .jcgrid-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;width:0;min-width:100%}
+  .jcgrid-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;width:0;min-width:100%;contain:inline-size}
+  .jcgridbar{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .jcarrows{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:8px}
+  .jcarrows small{font-size:12px;font-weight:700;color:var(--muted);margin-right:2px}
+  .jcarrow{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:22px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;padding:0 0 3px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .jcarrow:hover:not(:disabled){border-color:var(--orange);color:var(--orange)}
+  .jcarrow:disabled{opacity:.3;cursor:default}
   .jcgrid{display:grid;gap:4px}
   .jchead{font-size:12.5px;font-weight:800;padding:4px 6px 6px;line-height:1.25}
   .jchead small{display:block;font-size:11px;font-weight:600;color:var(--muted)}
-  .jcslot{position:sticky;left:0;z-index:1;background:#fafafa;font-size:12px;font-weight:700;color:var(--muted);padding:8px 4px 0 0}
+  .jcslot{position:sticky;left:0;z-index:1;background:#fafafa;box-shadow:4px 0 0 #fafafa,0 4px 0 #fafafa,4px 4px 0 #fafafa;font-size:12px;font-weight:700;color:var(--muted);padding:8px 4px 0 0}
   .jccell{min-height:44px;display:flex;flex-direction:column;gap:4px}
   .jcfree{flex:1;display:flex;align-items:center;justify-content:center;border:1px solid #e56a00;background:#ff7b00;color:#1f0a00;border-radius:8px;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;box-shadow:0 0 10px rgba(255,123,0,.6)}
   .jcjob{background:#dcfce7;border-left:3px solid var(--green);border-radius:8px;padding:5px 7px;font-size:12px;line-height:1.3;cursor:pointer}
@@ -1785,6 +1791,8 @@ function jcToggleDay(date){
   const opening=el.classList.contains('hide');
   el.classList.toggle('hide');
   if(chev)chev.textContent=opening?'▾':'▸';
+  const grid=opening&&el.querySelector('.jcgrid-scroll');
+  if(grid)jcArrowState(grid);
 }
 /* Per-staff view of one day: a column per ServiceM8 staff member, a row per booking slot, empty slots marked Free.
    Slots are the same 7/9/11/1/3/4:30 grid the Telegram Schedule Builder uses; a job sits in its nearest slot (ties go earlier, like the bot). */
@@ -1828,7 +1836,20 @@ function jcStaffGrid(jobs){
       if(!here.length)return s<0||n==='Unassigned'?'<div class="jccell"></div>':'<div class="jccell"><div class="jcfree">Free</div></div>';
       return '<div class="jccell">'+here.map(jcJobChip).join('')+'</div>';
     }).join('')).join('');
-  return JC_LEGEND+`<div class="jcgrid-scroll"><div class="jcgrid" style="grid-template-columns:52px repeat(${names.length},minmax(108px,1fr))"><div class="jcslot"></div>${head}${body}</div></div>`;
+  return `<div class="jcgridbar">${JC_LEGEND}<span class="jcarrows"><small>${names.length} staff</small><button class="jcarrow" onclick="jcScrollGrid(this,-1)" aria-label="Scroll staff left">‹</button><button class="jcarrow" onclick="jcScrollGrid(this,1)" aria-label="Scroll staff right">›</button></span></div>
+    <div class="jcgrid-scroll" onscroll="jcArrowState(this)"><div class="jcgrid" style="grid-template-columns:52px repeat(${names.length},minmax(130px,240px))"><div class="jcslot"></div>${head}${body}</div></div>`;
+}
+// ‹ › buttons page the slot grid sideways (about one screen of staff at a time) and grey out at either end.
+function jcScrollGrid(btn,dir){
+  const s=btn.closest('td').querySelector('.jcgrid-scroll');
+  if(s)s.scrollBy({left:dir*Math.max(130,s.clientWidth-60),behavior:'smooth'});
+}
+function jcArrowState(s){
+  const btns=s.closest('td').querySelectorAll('.jcarrow');
+  if(btns.length<2)return;
+  const max=s.scrollWidth-s.clientWidth;
+  btns[0].disabled=s.scrollLeft<=1;
+  btns[1].disabled=s.scrollLeft>=max-1;
 }
 /* Staff cards (Staff Schedule section): pick a day from the strip, one card per staff member with their 6 slots. No sideways scrolling on a phone. */
 let jcRows=[],jcSelDay='';
