@@ -1811,11 +1811,32 @@ function jcSlotOf(time){
 }
 const jcWho=j=>(j.staff||'').trim()||'Unassigned';
 const jcHasStaff=jobs=>(jobs||[]).some(j=>'staff' in j);
-function jcStaffNames(jobs){return [...new Set(jobs.map(jcWho))].sort((a,b)=>(a==='Unassigned')-(b==='Unassigned')||a.localeCompare(b));}
+// Daily capacity (jobs a day) per staff member, keyed by first name, in display order. These staff always show, even with no bookings.
+// Free = capacity - jobs booked. Anyone else with a booking uses the 6 standard slots as their capacity.
+const JC_STAFF_CAP={aaron:6,jackson:3,paras:4,kapil:5,bhuwan:5};
+const jcFirst=n=>n.trim().split(/\s+/)[0].toLowerCase();
+function jcCapOf(name){return name==='Unassigned'?0:(JC_STAFF_CAP[jcFirst(name)]??JC_SLOTS.length);}
+function jcRosterNames(){
+  // Full ServiceM8 names come from any job in the 3-week window; a staff member with none yet shows by first name.
+  const full=new Map();
+  jcRows.forEach(r=>(r.jobs||[]).forEach(j=>{const n=jcWho(j),k=jcFirst(n);if(k in JC_STAFF_CAP&&!full.has(k))full.set(k,n);}));
+  return Object.keys(JC_STAFF_CAP).map(k=>full.get(k)||k[0].toUpperCase()+k.slice(1));
+}
+function jcStaffNames(jobs){
+  const roster=jcRosterNames(),keys=new Set(roster.map(jcFirst));
+  const others=[...new Set(jobs.map(jcWho))].filter(n=>!keys.has(jcFirst(n))).sort((a,b)=>(a==='Unassigned')-(b==='Unassigned')||a.localeCompare(b));
+  return [...roster,...others];
+}
 function jcInSlot(jobs,name,slot){return jobs.filter(j=>jcWho(j)===name&&jcSlotOf(j.time)===slot).sort((a,b)=>(a.time||'')<(b.time||'')?-1:1);}
-function jcFreeSlots(jobs,name){return name==='Unassigned'?0:JC_SLOTS.filter((_,i)=>!jcInSlot(jobs,name,i).length).length;}
+// Which standard slots to mark Free: the earliest slots with no job near them, as many as capacity minus jobs booked.
+function jcFreeSlotIdx(jobs,name){
+  const booked=jobs.filter(j=>jcWho(j)===name).length;
+  const room=Math.max(0,jcCapOf(name)-booked);
+  return JC_SLOTS.map((_,i)=>i).filter(i=>!jcInSlot(jobs,name,i).length).slice(0,room);
+}
+function jcFreeSlots(jobs,name){return jcFreeSlotIdx(jobs,name).length;}
 function jcDayFree(jobs){return jcStaffNames(jobs).reduce((a,n)=>a+jcFreeSlots(jobs,n),0);}
-function jcBookedLine(jobs,name){const n=jobs.filter(j=>jcWho(j)===name).length;return n+' booked'+(name==='Unassigned'?'':' · '+jcFreeSlots(jobs,name)+' free');}
+function jcBookedLine(jobs,name){const n=jobs.filter(j=>jcWho(j)===name).length;return name==='Unassigned'?n+' booked':`${n}/${jcCapOf(name)} booked · ${jcFreeSlots(jobs,name)} free`;}
 function jcJobChip(j){
   return `<div class="jcjob${j.status==='Quote'?' q':''}" onclick="this.classList.toggle('open')">
       <div class="t">${esc(fmtTime12(j.time))||'No time'}</div>
@@ -1830,10 +1851,11 @@ function jcStaffGrid(jobs){
   const slots=JC_SLOTS.map((_,i)=>i);
   if(jobs.some(j=>jcSlotOf(j.time)<0))slots.push(-1);
   const head=names.map(n=>`<div class="jchead">${esc(n)}<small>${jcBookedLine(jobs,n)}</small></div>`).join('');
+  const free=new Map(names.map(n=>[n,jcFreeSlotIdx(jobs,n)]));
   const body=slots.map(s=>`<div class="jcslot">${s<0?'No time':JC_SLOT_LABELS[s]}</div>`
     +names.map(n=>{
       const here=jcInSlot(jobs,n,s);
-      if(!here.length)return s<0||n==='Unassigned'?'<div class="jccell"></div>':'<div class="jccell"><div class="jcfree">Free</div></div>';
+      if(!here.length)return free.get(n).includes(s)?'<div class="jccell"><div class="jcfree">Free</div></div>':'<div class="jccell"></div>';
       return '<div class="jccell">'+here.map(jcJobChip).join('')+'</div>';
     }).join('')).join('');
   return `<div class="jcgridbar">${JC_LEGEND}<span class="jcarrows"><small>${names.length} staff</small><button class="jcarrow" onclick="jcScrollGrid(this,-1)" aria-label="Scroll staff left">‹</button><button class="jcarrow" onclick="jcScrollGrid(this,1)" aria-label="Scroll staff right">›</button></span></div>
@@ -1863,20 +1885,16 @@ function renderJcSchedule(){
   if(!days.some(r=>r.date===jcSelDay))jcSelDay=days[0].date;
   document.getElementById('jcStrip').innerHTML=days.map(r=>{
     const jobs=r.jobs||[],free=jcDayFree(jobs);
-    const note=!jobs.length?'No jobs':free?free+' free':'Full';
+    const note=free?free+' free':'Full';
     return `<button class="jcdchip${r.date===jcSelDay?' on':''}" onclick="jcPickDay('${r.date}')"><div class="dd">${jcDayAbbr(r.date)}</div><div class="dn">${+r.date.slice(8)}</div><div class="df${free?'':' none'}">${note}</div></button>`;
   }).join('');
   const day=days.find(r=>r.date===jcSelDay),jobs=day.jobs||[];
   const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length} booked · ${jcDayFree(jobs)} free slot${jcDayFree(jobs)===1?'':'s'}</small></div>`;
-  if(!jobs.length){document.getElementById('jcCards').innerHTML=title+'<div class="empty" style="padding:24px">No jobs booked this day yet.</div>';return;}
   const cards=jcStaffNames(jobs).map(n=>{
-    // Every job gets its own box at its real time (no cap); a standard slot shows Free only if no job sits nearest to it.
+    // Every job gets its own box at its real time (no cap); Free boxes are the earliest open standard slots, up to their daily capacity.
     const mine=jobs.filter(j=>jcWho(j)===n);
     const items=mine.map(j=>({mins:jcMins(j.time),html:'<div class="jcbox">'+jcJobChip(j)+'</div>'}));
-    if(n!=='Unassigned')JC_SLOTS.forEach((m,i)=>{
-      if(!mine.some(j=>jcSlotOf(j.time)===i))items.push({mins:m,html:`<div class="jcbox"><div class="jcfree slot"><span>${JC_SLOT_LABELS[i]}</span>Free</div></div>`});
-    });
-    const boxes=items.sort((a,b)=>a.mins-b.mins).map(x=>x.html).join('');
+    jcFreeSlotIdx(jobs,n).forEach(i=>items.push({mins:JC_SLOTS[i],html:`<div class="jcbox"><div class="jcfree slot"><span>${JC_SLOT_LABELS[i]}</span>Free</div></div>`}));    const boxes=items.sort((a,b)=>a.mins-b.mins).map(x=>x.html).join('');
     return `<div class="jccard"><div class="jccard-h">${esc(n)}<small>${jcBookedLine(jobs,n)}</small></div><div class="jcboxes">${boxes}</div></div>`;
   }).join('');
   document.getElementById('jcCards').innerHTML=title+JC_LEGEND+`<div class="jccards">${cards}</div>`;
@@ -1955,12 +1973,13 @@ async function renderJobCount(){
     </tr>`;
   }).join('');
   const t=todayStr();
+  const staffMode=rows.some(r=>jcHasStaff(r.jobs));
   body.innerHTML=rows.map(r=>{
     const jobs=r.jobs||[];
     const rowBg=r.date===t?'background:#fdf7f3':'';
-    // Once the sync tags each job with its ServiceM8 staff member, show the per-staff slot grid; otherwise the plain list.
-    const detail=!jobs.length?'<div style="color:var(--muted);padding:6px 0">No job details available</div>'
-      :jcHasStaff(jobs)?jcStaffGrid(jobs)
+    // Once the sync tags jobs with their ServiceM8 staff member, every day (even an empty one) shows the per-staff slot grid; otherwise the plain list.
+    const detail=staffMode?jcStaffGrid(jobs)
+      :!jobs.length?'<div style="color:var(--muted);padding:6px 0">No job details available</div>'
       :jobs.map(j=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">
           <span style="font-weight:600">${esc(fmtTime12(j.time))}</span>
           <span class="badge" style="margin-left:8px;background:${j.status==='Quote'?'#ede9fe':'#dcfce7'};color:${j.status==='Quote'?'#7c3aed':'#16a34a'}">${esc(j.status)}</span>
