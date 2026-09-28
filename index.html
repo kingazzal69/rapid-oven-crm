@@ -1835,7 +1835,9 @@ function jcFreeSlotIdx(jobs,name){
   return JC_SLOTS.map((_,i)=>i).filter(i=>!jcInSlot(jobs,name,i).length).slice(0,room);
 }
 function jcFreeSlots(jobs,name){return jcFreeSlotIdx(jobs,name).length;}
-function jcDayFree(jobs){return jcStaffNames(jobs).reduce((a,n)=>a+jcFreeSlots(jobs,n),0);}
+// Day totals are overall: every job booked that day (unassigned included) against the team's combined daily capacity.
+const JC_DAY_CAP=Object.values(JC_STAFF_CAP).reduce((a,b)=>a+b,0);
+function jcDayFree(jobs){return Math.max(0,JC_DAY_CAP-jobs.length);}
 function jcBookedLine(jobs,name){const n=jobs.filter(j=>jcWho(j)===name).length;return name==='Unassigned'?n+' booked':`${n}/${jcCapOf(name)} booked · ${jcFreeSlots(jobs,name)} free`;}
 function jcJobChip(j){
   return `<div class="jcjob${j.status==='Quote'?' q':''}" onclick="this.classList.toggle('open')">
@@ -1889,7 +1891,7 @@ function renderJcSchedule(){
     return `<button class="jcdchip${r.date===jcSelDay?' on':''}" onclick="jcPickDay('${r.date}')"><div class="dd">${jcDayAbbr(r.date)}</div><div class="dn">${+r.date.slice(8)}</div><div class="df${free?'':' none'}">${note}</div></button>`;
   }).join('');
   const day=days.find(r=>r.date===jcSelDay),jobs=day.jobs||[];
-  const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length} booked · ${jcDayFree(jobs)} free slot${jcDayFree(jobs)===1?'':'s'}</small></div>`;
+  const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length}/${JC_DAY_CAP} booked · ${jcDayFree(jobs)} free</small></div>`;
   const cards=jcStaffNames(jobs).map(n=>{
     // Every job gets its own box at its real time (no cap); Free boxes are the earliest open standard slots, up to their daily capacity.
     const mine=jobs.filter(j=>jcWho(j)===n);
