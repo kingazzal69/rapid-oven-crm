@@ -223,7 +223,7 @@
   .jchead small{display:block;font-size:11px;font-weight:600;color:var(--muted)}
   .jcslot{position:sticky;left:0;z-index:1;background:#fafafa;font-size:12px;font-weight:700;color:var(--muted);padding:8px 4px 0 0}
   .jccell{min-height:44px;display:flex;flex-direction:column;gap:4px}
-  .jcfree{flex:1;display:flex;align-items:center;justify-content:center;border:1px dashed #86efac;background:#f0fdf4;color:var(--green);border-radius:8px;font-size:12px;font-weight:700}
+  .jcfree{flex:1;display:flex;align-items:center;justify-content:center;border:1px solid #22c55e;background:#4ade80;color:#052e16;border-radius:8px;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;box-shadow:0 1px 3px rgba(34,197,94,.35)}
   .jcjob{background:#dcfce7;border-left:3px solid var(--green);border-radius:8px;padding:5px 7px;font-size:12px;line-height:1.3;cursor:pointer}
   .jcjob.q{background:#ede9fe;border-left-color:var(--purple)}
   .jcjob .t{font-weight:800}
@@ -233,6 +233,7 @@
   .jclegend{font-size:12px;color:var(--muted);margin:2px 0 8px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
   .jclegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;background:var(--green)}
   .jclegend i.q{background:var(--purple)}
+  .jclegend i.f{background:#4ade80;box-shadow:0 0 0 1px #22c55e}
   .jcstrip{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;margin-bottom:10px}
   .jcdchip{flex:0 0 auto;min-width:62px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:7px 6px;text-align:center;color:var(--ink)}
   .jcdchip.on{background:var(--orange);border-color:var(--orange);color:#fff}
@@ -251,7 +252,7 @@
   .jcbox{min-height:50px;display:flex;flex-direction:column;gap:4px}
   .jcbox .jcjob{flex:1}
   .jcfree.slot{flex-direction:column;gap:1px;min-height:50px}
-  .jcfree.slot span{font-size:11.5px;font-weight:800;color:#15803d}
+  .jcfree.slot span{font-size:11.5px;font-weight:800;color:#052e16;text-transform:none;letter-spacing:0}
 
   /* Follow-up templates */
   .tplbar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
@@ -1788,10 +1789,14 @@ function jcToggleDay(date){
 /* Per-staff view of one day: a column per ServiceM8 staff member, a row per booking slot, empty slots marked Free.
    Slots are the same 7/9/11/1/3/4:30 grid the Telegram Schedule Builder uses; a job sits in its nearest slot (ties go earlier, like the bot). */
 const JC_SLOTS=[420,540,660,780,900,990],JC_SLOT_LABELS=['7am','9am','11am','1pm','3pm','4:30pm'];
-function jcSlotOf(time){
-  if(!/^\d{1,2}:\d{2}/.test(time||''))return -1;
+function jcMins(time){
+  if(!/^\d{1,2}:\d{2}/.test(time||''))return Infinity;
   const [h,m]=time.split(':').map(Number);
-  const mins=h*60+m;
+  return h*60+m;
+}
+function jcSlotOf(time){
+  const mins=jcMins(time);
+  if(mins===Infinity)return -1;
   let best=0;
   JC_SLOTS.forEach((s,i)=>{if(Math.abs(s-mins)<Math.abs(JC_SLOTS[best]-mins))best=i;});
   return best;
@@ -1810,7 +1815,7 @@ function jcJobChip(j){
       ${(j.description||'').trim()?`<div class="d">${esc(j.description.trim())}</div>`:''}
     </div>`;
 }
-const JC_LEGEND='<div class="jclegend"><span><i class="q"></i>Quote</span><span><i></i>Work Order</span><span>Tap a job for details</span></div>';
+const JC_LEGEND='<div class="jclegend"><span><i class="q"></i>Quote</span><span><i></i>Work Order</span><span><i class="f"></i>Free</span><span>Tap a job for details</span></div>';
 /* Slot grid (shown when a Daily Breakdown row is expanded): column per staff member, row per slot. */
 function jcStaffGrid(jobs){
   const names=jcStaffNames(jobs);
@@ -1841,16 +1846,16 @@ function renderJcSchedule(){
     return `<button class="jcdchip${r.date===jcSelDay?' on':''}" onclick="jcPickDay('${r.date}')"><div class="dd">${jcDayAbbr(r.date)}</div><div class="dn">${+r.date.slice(8)}</div><div class="df${free?'':' none'}">${note}</div></button>`;
   }).join('');
   const day=days.find(r=>r.date===jcSelDay),jobs=day.jobs||[];
-  const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length} booked · ${jcDayFree(jobs)} free slots</small></div>`;
+  const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length} booked · ${jcDayFree(jobs)} free slot${jcDayFree(jobs)===1?'':'s'}</small></div>`;
   if(!jobs.length){document.getElementById('jcCards').innerHTML=title+'<div class="empty" style="padding:24px">No jobs booked this day yet.</div>';return;}
   const cards=jcStaffNames(jobs).map(n=>{
-    const slots=JC_SLOTS.map((_,i)=>i);
-    if(jobs.some(j=>jcWho(j)===n&&jcSlotOf(j.time)<0))slots.push(-1);
-    const boxes=slots.map(s=>{
-      const here=jcInSlot(jobs,n,s);
-      if(here.length)return '<div class="jcbox">'+here.map(jcJobChip).join('')+'</div>';
-      return n==='Unassigned'?'':`<div class="jcbox"><div class="jcfree slot"><span>${JC_SLOT_LABELS[s]}</span>Free</div></div>`;
-    }).join('');
+    // Every job gets its own box at its real time (no cap); a standard slot shows Free only if no job sits nearest to it.
+    const mine=jobs.filter(j=>jcWho(j)===n);
+    const items=mine.map(j=>({mins:jcMins(j.time),html:'<div class="jcbox">'+jcJobChip(j)+'</div>'}));
+    if(n!=='Unassigned')JC_SLOTS.forEach((m,i)=>{
+      if(!mine.some(j=>jcSlotOf(j.time)===i))items.push({mins:m,html:`<div class="jcbox"><div class="jcfree slot"><span>${JC_SLOT_LABELS[i]}</span>Free</div></div>`});
+    });
+    const boxes=items.sort((a,b)=>a.mins-b.mins).map(x=>x.html).join('');
     return `<div class="jccard"><div class="jccard-h">${esc(n)}<small>${jcBookedLine(jobs,n)}</small></div><div class="jcboxes">${boxes}</div></div>`;
   }).join('');
   document.getElementById('jcCards').innerHTML=title+JC_LEGEND+`<div class="jccards">${cards}</div>`;
