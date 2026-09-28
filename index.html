@@ -233,6 +233,25 @@
   .jclegend{font-size:12px;color:var(--muted);margin:2px 0 8px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
   .jclegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;background:var(--green)}
   .jclegend i.q{background:var(--purple)}
+  .jcstrip{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;margin-bottom:10px}
+  .jcdchip{flex:0 0 auto;min-width:62px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:7px 6px;text-align:center;color:var(--ink)}
+  .jcdchip.on{background:var(--orange);border-color:var(--orange);color:#fff}
+  .jcdchip .dd{font-size:11px;font-weight:700;opacity:.75}
+  .jcdchip .dn{font-size:18px;font-weight:800;line-height:1.2}
+  .jcdchip .df{font-size:11px;font-weight:700;color:var(--green)}
+  .jcdchip .df.none{color:var(--muted)}
+  .jcdchip.on .df{color:#fff}
+  .jcday-h{font-size:17px;font-weight:800;margin-bottom:6px}
+  .jcday-h small{font-size:13px;font-weight:600;color:var(--muted)}
+  .jccards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:10px}
+  .jccard{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px}
+  .jccard-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:15px;font-weight:800}
+  .jccard-h small{font-size:12.5px;font-weight:600;color:var(--muted);text-align:right}
+  .jcboxes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .jcbox{min-height:50px;display:flex;flex-direction:column;gap:4px}
+  .jcbox .jcjob{flex:1}
+  .jcfree.slot{flex-direction:column;gap:1px;min-height:50px}
+  .jcfree.slot span{font-size:11.5px;font-weight:800;color:#15803d}
 
   /* Follow-up templates */
   .tplbar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
@@ -551,6 +570,11 @@
           <tbody id="jcWeekBody"></tbody>
         </table>
       </div>
+    </div>
+    <div id="jcStaffWrap" class="hide">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:20px 0 6px">Staff Schedule</div>
+      <div class="jcstrip" id="jcStrip"></div>
+      <div id="jcCards"></div>
     </div>
     <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:20px 0 6px">Daily Breakdown</div>
     <div class="tablewrap">
@@ -1772,29 +1796,64 @@ function jcSlotOf(time){
   JC_SLOTS.forEach((s,i)=>{if(Math.abs(s-mins)<Math.abs(JC_SLOTS[best]-mins))best=i;});
   return best;
 }
+const jcWho=j=>(j.staff||'').trim()||'Unassigned';
+const jcHasStaff=jobs=>(jobs||[]).some(j=>'staff' in j);
+function jcStaffNames(jobs){return [...new Set(jobs.map(jcWho))].sort((a,b)=>(a==='Unassigned')-(b==='Unassigned')||a.localeCompare(b));}
+function jcInSlot(jobs,name,slot){return jobs.filter(j=>jcWho(j)===name&&jcSlotOf(j.time)===slot).sort((a,b)=>(a.time||'')<(b.time||'')?-1:1);}
+function jcFreeSlots(jobs,name){return name==='Unassigned'?0:JC_SLOTS.filter((_,i)=>!jcInSlot(jobs,name,i).length).length;}
+function jcDayFree(jobs){return jcStaffNames(jobs).reduce((a,n)=>a+jcFreeSlots(jobs,n),0);}
+function jcBookedLine(jobs,name){const n=jobs.filter(j=>jcWho(j)===name).length;return n+' booked'+(name==='Unassigned'?'':' · '+jcFreeSlots(jobs,name)+' free');}
+function jcJobChip(j){
+  return `<div class="jcjob${j.status==='Quote'?' q':''}" onclick="this.classList.toggle('open')">
+      <div class="t">${esc(fmtTime12(j.time))||'No time'}</div>
+      <div class="c">${esc(j.customer)}</div>
+      ${(j.description||'').trim()?`<div class="d">${esc(j.description.trim())}</div>`:''}
+    </div>`;
+}
+const JC_LEGEND='<div class="jclegend"><span><i class="q"></i>Quote</span><span><i></i>Work Order</span><span>Tap a job for details</span></div>';
+/* Slot grid (shown when a Daily Breakdown row is expanded): column per staff member, row per slot. */
 function jcStaffGrid(jobs){
-  const who=j=>(j.staff||'').trim()||'Unassigned';
-  const names=[...new Set(jobs.map(who))].sort((a,b)=>(a==='Unassigned')-(b==='Unassigned')||a.localeCompare(b));
+  const names=jcStaffNames(jobs);
   const slots=JC_SLOTS.map((_,i)=>i);
   if(jobs.some(j=>jcSlotOf(j.time)<0))slots.push(-1);
-  const inCell=(name,slot)=>jobs.filter(j=>who(j)===name&&jcSlotOf(j.time)===slot).sort((a,b)=>(a.time||'')<(b.time||'')?-1:1);
-  const head=names.map(n=>{
-    const mine=jobs.filter(j=>who(j)===n);
-    const free=JC_SLOTS.filter((_,i)=>!mine.some(j=>jcSlotOf(j.time)===i)).length;
-    return `<div class="jchead">${esc(n)}<small>${mine.length} booked${n==='Unassigned'?'':` · ${free} free`}</small></div>`;
-  }).join('');
+  const head=names.map(n=>`<div class="jchead">${esc(n)}<small>${jcBookedLine(jobs,n)}</small></div>`).join('');
   const body=slots.map(s=>`<div class="jcslot">${s<0?'No time':JC_SLOT_LABELS[s]}</div>`
     +names.map(n=>{
-      const here=inCell(n,s);
+      const here=jcInSlot(jobs,n,s);
       if(!here.length)return s<0||n==='Unassigned'?'<div class="jccell"></div>':'<div class="jccell"><div class="jcfree">Free</div></div>';
-      return '<div class="jccell">'+here.map(j=>`<div class="jcjob${j.status==='Quote'?' q':''}" onclick="this.classList.toggle('open')">
-          <div class="t">${esc(fmtTime12(j.time))||'No time'}</div>
-          <div class="c">${esc(j.customer)}</div>
-          ${(j.description||'').trim()?`<div class="d">${esc(j.description.trim())}</div>`:''}
-        </div>`).join('')+'</div>';
+      return '<div class="jccell">'+here.map(jcJobChip).join('')+'</div>';
     }).join('')).join('');
-  return `<div class="jclegend"><span><i class="q"></i>Quote</span><span><i></i>Work Order</span><span>Tap a job for details</span></div>
-    <div class="jcgrid-scroll"><div class="jcgrid" style="grid-template-columns:52px repeat(${names.length},minmax(108px,1fr))"><div class="jcslot"></div>${head}${body}</div></div>`;
+  return JC_LEGEND+`<div class="jcgrid-scroll"><div class="jcgrid" style="grid-template-columns:52px repeat(${names.length},minmax(108px,1fr))"><div class="jcslot"></div>${head}${body}</div></div>`;
+}
+/* Staff cards (Staff Schedule section): pick a day from the strip, one card per staff member with their 6 slots. No sideways scrolling on a phone. */
+let jcRows=[],jcSelDay='';
+function jcPickDay(date){jcSelDay=date;renderJcSchedule();}
+function renderJcSchedule(){
+  const wrap=document.getElementById('jcStaffWrap');
+  const t=todayStr();
+  const days=jcRows.filter(r=>r.date>=t);
+  if(!days.some(r=>jcHasStaff(r.jobs))){wrap.classList.add('hide');return;}
+  wrap.classList.remove('hide');
+  if(!days.some(r=>r.date===jcSelDay))jcSelDay=days[0].date;
+  document.getElementById('jcStrip').innerHTML=days.map(r=>{
+    const jobs=r.jobs||[],free=jcDayFree(jobs);
+    const note=!jobs.length?'No jobs':free?free+' free':'Full';
+    return `<button class="jcdchip${r.date===jcSelDay?' on':''}" onclick="jcPickDay('${r.date}')"><div class="dd">${jcDayAbbr(r.date)}</div><div class="dn">${+r.date.slice(8)}</div><div class="df${free?'':' none'}">${note}</div></button>`;
+  }).join('');
+  const day=days.find(r=>r.date===jcSelDay),jobs=day.jobs||[];
+  const title=`<div class="jcday-h">${jcDayAbbr(day.date)} ${esc(fmtD(day.date))}${day.date===t?' (today)':''} <small>· ${jobs.length} booked · ${jcDayFree(jobs)} free slots</small></div>`;
+  if(!jobs.length){document.getElementById('jcCards').innerHTML=title+'<div class="empty" style="padding:24px">No jobs booked this day yet.</div>';return;}
+  const cards=jcStaffNames(jobs).map(n=>{
+    const slots=JC_SLOTS.map((_,i)=>i);
+    if(jobs.some(j=>jcWho(j)===n&&jcSlotOf(j.time)<0))slots.push(-1);
+    const boxes=slots.map(s=>{
+      const here=jcInSlot(jobs,n,s);
+      if(here.length)return '<div class="jcbox">'+here.map(jcJobChip).join('')+'</div>';
+      return n==='Unassigned'?'':`<div class="jcbox"><div class="jcfree slot"><span>${JC_SLOT_LABELS[s]}</span>Free</div></div>`;
+    }).join('');
+    return `<div class="jccard"><div class="jccard-h">${esc(n)}<small>${jcBookedLine(jobs,n)}</small></div><div class="jcboxes">${boxes}</div></div>`;
+  }).join('');
+  document.getElementById('jcCards').innerHTML=title+JC_LEGEND+`<div class="jccards">${cards}</div>`;
 }
 async function renderJobCount(){
   const statsEl=document.getElementById('jcStats');
@@ -1815,6 +1874,7 @@ async function renderJobCount(){
     emptyEl.textContent='Could not load job count data — try again shortly.';
     emptyEl.classList.remove('hide');
     updEl.textContent='';
+    jcRows=[];renderJcSchedule();
     return;
   }
   if(!rows.length){
@@ -1822,9 +1882,11 @@ async function renderJobCount(){
     emptyEl.textContent='No job count data yet — check back after the sync runs.';
     emptyEl.classList.remove('hide');
     updEl.textContent='';
+    jcRows=[];renderJcSchedule();
     return;
   }
   emptyEl.classList.add('hide');
+  jcRows=rows;renderJcSchedule();
   const days=rows.length;
   const totalQ=rows.reduce((a,r)=>a+(+r.quotes||0),0);
   const totalWO=rows.reduce((a,r)=>a+(+r.work_orders||0),0);
@@ -1872,7 +1934,7 @@ async function renderJobCount(){
     const rowBg=r.date===t?'background:#fdf7f3':'';
     // Once the sync tags each job with its ServiceM8 staff member, show the per-staff slot grid; otherwise the plain list.
     const detail=!jobs.length?'<div style="color:var(--muted);padding:6px 0">No job details available</div>'
-      :jobs.some(j=>'staff' in j)?jcStaffGrid(jobs)
+      :jcHasStaff(jobs)?jcStaffGrid(jobs)
       :jobs.map(j=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">
           <span style="font-weight:600">${esc(fmtTime12(j.time))}</span>
           <span class="badge" style="margin-left:8px;background:${j.status==='Quote'?'#ede9fe':'#dcfce7'};color:${j.status==='Quote'?'#7c3aed':'#16a34a'}">${esc(j.status)}</span>
