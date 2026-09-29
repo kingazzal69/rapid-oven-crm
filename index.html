@@ -2022,7 +2022,7 @@ async function renderJobCount(){
     </tr>`;
   }).join('');
   const latest=rows.reduce((a,r)=>Math.max(a,new Date(r.updated_at).getTime()||0),0);
-  updEl.textContent=latest?('Updated '+ago(latest)+' · syncs every 5 hours'):'';
+  updEl.textContent=latest?('Updated '+ago(latest)+' · syncs every hour'):'';
 }
 
 /* ---------- Calendar ---------- */
