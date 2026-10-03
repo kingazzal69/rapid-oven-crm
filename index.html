@@ -698,7 +698,7 @@
       <button class="btn danger" id="pDeleteBtn" onclick="deleteProject()">Delete</button>
       <div style="display:flex;gap:10px">
         <button class="btn sec" onclick="closeProject()">Cancel</button>
-        <button class="btn primary" onclick="saveProject()">Save</button>
+        <button class="btn primary" onclick="saveProjectModal()">Save</button>
       </div>
     </div>
   </div>
@@ -1020,13 +1020,13 @@ function startRealtime(){
     if(!loading&&document.getElementById('page-jobcount').classList.contains('active'))renderJobCount();
   });});
 }
-const syncQueue={};
+let syncQueue={};
 function debounceSync(key,fn){
   syncQueue[key]=fn;
   clearTimeout(syncTimer);
   syncTimer=setTimeout(async()=>{
-    for(const k of Object.keys(syncQueue)){try{await syncQueue[k]();}catch(e){}}
-    syncQueue={};
+    const q=syncQueue;syncQueue={};
+    for(const k of Object.keys(q)){try{await q[k]();}catch(e){}}
   },300);
 }
 
@@ -1409,6 +1409,11 @@ function renderPager(total,pages,start,shown){
   el.innerHTML=html;
 }
 function rowOpen(e,id){if(e.target.closest('a,button'))return;openModal(id);}
+function fuCellChange(id,val){
+  const l=leads.find(x=>x.id===id);
+  if(!l)return;
+  l.followUp=val;syncLead(l);renderTable();
+}
 function fuCellSelect(l){
   const t=todayStr();
   const closed=TERMINAL_STAGES.includes(l.stage);
@@ -1419,7 +1424,7 @@ function fuCellSelect(l){
     const sel=l.followUp===val?' selected':'';
     return `<option value="${val}"${sel}>${label}</option>`;
   }).join('');
-  return `<select class="stagesel" onchange="event.stopPropagation();l.followUp=this.value;syncLead(l);renderTable()" onclick="event.stopPropagation()" style="max-width:100px">
+  return `<select class="stagesel" onchange="event.stopPropagation();fuCellChange('${l.id}',this.value)" onclick="event.stopPropagation()" style="max-width:100px">
     ${opts}</select>`;
 }
 
@@ -1653,7 +1658,7 @@ function openProject(id){
   }
 }
 function closeProject(){document.getElementById('overlay2').classList.remove('open');}
-async function saveProject(){
+async function saveProjectModal(){
   const name=document.getElementById('p-name').value.trim();
   if(!name){document.getElementById('p-name').focus();return;}
   const id=document.getElementById('p-id').value;
@@ -1665,10 +1670,12 @@ async function saveProject(){
     due:document.getElementById('p-due').value,
     notes:document.getElementById('p-notes').value.trim(),
   };
-  if(id)Object.assign(projects.find(x=>x.id===id),data);
-  else projects.push({id:uid(),createdAt:Date.now(),...data});
-  await saveProject(projects.find(x=>x.id===id||x.id===uid()));
+  let p=id&&projects.find(x=>x.id===id);
+  if(p)Object.assign(p,data);
+  else{p={id:uid(),createdAt:Date.now(),...data};projects.push(p);}
+  await saveProject(p);
   closeProject();
+  renderProjects();
 }
 async function deleteProject(){
   const id=document.getElementById('p-id').value;
@@ -1747,7 +1754,7 @@ function toggleTodo(id){
   saveTodo(x);renderTodos();
 }
 function delTodo(id){todos=todos.filter(t=>t.id!==id);deleteTodoDb(id);renderTodos();}
-function clearDone(){todos=todos.filter(t=>!t.done);saveTodos();renderTodos();}
+function clearDone(){const done=todos.filter(t=>t.done);todos=todos.filter(t=>!t.done);done.forEach(t=>deleteTodoDb(t.id));renderTodos();}
 function renderTodos(){
   renderGameBar();
   const listEl=document.getElementById('todoList');
