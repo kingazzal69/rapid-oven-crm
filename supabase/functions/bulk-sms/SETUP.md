@@ -35,9 +35,10 @@ Then Authentication → Sign In / Providers → turn **off** "Allow new users to
 doesn't use sign-ups for anything else).
 
 **c. Two-factor.** Authentication → Multi-Factor: make sure **TOTP (authenticator app)** is enabled
-(it is by default). Right after creating the login, open the CRM, tick any client, press Bulk SMS
-and sign in once — it shows a QR code; scan it with an authenticator app. Do this straight away:
-until two-factor is set up, anyone with the password could set it up with their own phone.
+(it is by default). Bulk SMS now uses the CRM's own shared login, so the code is set up once for the
+whole CRM: open the CRM with `#setup-2fa` on the end of the address, sign in, and scan the QR code with
+the authenticator app (the CRM never offers a QR code otherwise). Do this straight away: until two-factor
+is set up, anyone with the password could set it up with their own phone.
 
 **d. Deploy the function.** With the Supabase CLI:
 

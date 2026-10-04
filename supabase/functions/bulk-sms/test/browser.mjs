@@ -1,5 +1,6 @@
 // Drives the real CRM page (index.html) in headless Chromium against the real bulk-sms
 // function, with a fake database, fake sign-in/2FA, and a stubbed n8n/MobileMessage.
+// The CRM has one sign-in (password + code) that also covers bulk SMS, so the page's data client is also its auth client.
 // No network, no real accounts, no SMS.
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright/index.mjs node supabase/functions/bulk-sms/test/browser.mjs
 import { readFileSync } from "node:fs";
@@ -51,7 +52,7 @@ async function invoke(_name, body, level) {
 // ---- browser-side stand-ins for supabase-js and Leaflet ----
 const supabaseStub = `
 window.__writes=[];
-window.supabase={createClient(url,key,opts){return opts&&opts.auth&&opts.auth.storageKey?smsClient():dataClient();}};
+window.supabase={createClient(){const d=dataClient(),a=authClient();return{...d,auth:a.auth,functions:a.functions};}};
 function dataClient(){
   function q(table){
     const st={archived:null,op:'select',from:0,to:1e9};
@@ -70,8 +71,9 @@ function dataClient(){
   }
   return{from:q,channel(){const c={on(){return c},subscribe(){return c}};return c},removeChannel(){}};
 }
-function smsClient(){
-  const load=()=>JSON.parse(sessionStorage.getItem('__fakeAuth')||'null')||{session:false,aal:'aal1',factor:null};
+function authClient(){
+  // The shared login already has its code set up (the gate never enrols one).
+  const load=()=>JSON.parse(sessionStorage.getItem('__fakeAuth')||'null')||{session:false,aal:'aal1',factor:{id:'f1',factor_type:'totp',status:'verified'}};
   const save=s=>sessionStorage.setItem('__fakeAuth',JSON.stringify(s));
   const user={email:'aaron@example.com'};
   return{
@@ -79,6 +81,7 @@ function smsClient(){
       async getSession(){const s=load();return{data:{session:s.session?{user}:null},error:null}},
       async signInWithPassword({password}){const s=load();if(password!=='right')return{data:{},error:{message:'Invalid login credentials'}};s.session=true;s.aal='aal1';save(s);return{data:{user},error:null}},
       async signOut(){const s=load();s.session=false;s.aal='aal1';save(s);return{error:null}},
+      onAuthStateChange(){return{data:{subscription:{unsubscribe(){}}}}},
       mfa:{
         async getAuthenticatorAssuranceLevel(){return{data:{currentLevel:load().aal},error:null}},
         async listFactors(){const f=load().factor?[load().factor]:[];return{data:{all:f,totp:f.filter(x=>x.status==='verified')},error:null}},
@@ -125,6 +128,28 @@ const settle = async () => { await Promise.all(inflight); await page.waitForTime
 const shot = async (name) => { if (process.env.SCREENSHOTS) await page.locator("#bulkSmsOverlay .modal").screenshot({ path: join(process.env.SCREENSHOTS, name + ".png") }); };
 
 await page.goto("https://kingazzal69.github.io/rapid-oven-crm/");
+
+await step("the CRM stays locked until the password and the code are both right", async () => {
+  await page.waitForSelector("#authSignIn:not(.hide)");
+  assert.equal(await page.evaluate(() => leads.length), 0, "nothing loads before sign-in");
+  await page.fill("#authEmail", "aaron@example.com");
+  await page.fill("#authPassword", "wrong");
+  await page.click("#authSignInButton");
+  await page.waitForTimeout(100);
+  assert.match(await page.locator("#authStatus").innerText(), /isn.t right/);
+  await page.fill("#authPassword", "right");
+  await page.click("#authSignInButton");
+  await page.waitForSelector("#authMfa:not(.hide)");
+  assert.equal(await page.evaluate(() => leads.length), 0, "password alone loads nothing");
+  await page.fill("#authCode", "000000");
+  await page.click("#authVerifyButton");
+  await page.waitForTimeout(100);
+  assert.match(await page.locator("#authStatus").innerText(), /didn.t work/);
+  await page.fill("#authCode", "123456");
+  await page.click("#authVerifyButton");
+  await page.waitForFunction(() => typeof leads !== "undefined" && leads.length > 200);
+  assert.ok(await page.locator("#authGate").evaluate((e) => e.classList.contains("hide")));
+});
 await page.waitForFunction(() => typeof leads !== "undefined" && leads.length > 200);
 await page.click("#nav-clients");
 await page.waitForFunction(() => leads.some((l) => l.id === "H1"));
@@ -154,31 +179,12 @@ await step("ticks survive paging, searching and reloads; header box only affects
   assert.deepEqual(await selected(), ["H1", "X1", onPage2].sort());
 });
 
-await step("sign-in then two-factor setup are required before the composer", async () => {
+await step("bulk SMS opens straight to the composer: the CRM sign-in is enough", async () => {
   await openModal();
-  assert.ok(await visible("#bulkSmsSignIn"));
-  await shot("1-sign-in");
-  assert.ok(!(await visible("#bulkSmsComposer")));
-  await page.fill("#bulkSmsEmail", "aaron@example.com");
-  await page.fill("#bulkSmsPassword", "wrong");
-  await page.click("#bulkSmsSignInButton");
-  await page.waitForTimeout(100);
-  assert.match(await status(), /Invalid login/);
-  await page.fill("#bulkSmsPassword", "right");
-  await page.click("#bulkSmsSignInButton");
-  await page.waitForTimeout(200);
-  assert.ok(await visible("#bulkSmsMfa"));
-  assert.ok(await visible("#bulkSmsMfaQr"), "first time: QR code shown for setup");
-  await shot("2-two-factor");
-  assert.ok(!(await visible("#bulkSmsComposer")));
-  await page.fill("#bulkSmsMfaCode", "000000");
-  await page.click("#bulkSmsMfaButton");
-  await page.waitForTimeout(100);
-  assert.match(await status(), /didn.t work/);
-  await page.fill("#bulkSmsMfaCode", "123456");
-  await page.click("#bulkSmsMfaButton");
   await settle();
   assert.ok(await visible("#bulkSmsComposer"));
+  assert.equal(await page.locator("#bulkSmsEmail").count(), 0, "no separate bulk SMS sign-in");
+  await shot("1-compose");
   const options = await page.locator("#bulkSmsTemplate option").count();
   assert.equal(options, await page.evaluate(() => tpls.length), "bulk templates were copied from the quick-SMS ones");
 });
@@ -212,7 +218,7 @@ await step("review lists problems, opted-out, shared numbers; send stays blocked
   await search("");
   await openModal();
   await settle();
-  assert.ok(await visible("#bulkSmsComposer"), "already signed in with 2FA: straight to composer");
+  assert.ok(await visible("#bulkSmsComposer"), "signed in with the code: straight to composer");
   await page.selectOption("#bulkSmsTemplate", "0");
   await page.click("#bulkSmsReviewButton");
   await settle();

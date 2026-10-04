@@ -4,9 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rapid Oven Cleaning — CRM</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#161616">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Rapid CRM">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<!-- Pinned (with integrity hash) because the page now holds a long-lived sign-in. To upgrade: change the version and recompute the sha384. -->
+<script src="https://unpkg.com/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <style>
   :root{
     --orange:#F26A21;
@@ -149,7 +157,6 @@
   .bulk-sms-status.error{color:var(--red)}
   .bulk-sms-status.success{color:var(--green)}
   #bulkSmsButton:disabled,#bulkSmsOverlay .btn:disabled,#bulkSmsOverlay .tbtn:disabled{opacity:.45;cursor:not-allowed}
-  .bulk-sms-signedin{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--green)}
   .bulk-sms-section{margin-top:14px}
   .bulk-sms-section summary{cursor:pointer;font-size:13px;font-weight:700;color:#374151}
   .bulk-sms-section h4{font-size:13px;font-weight:800;margin:0 0 6px}
@@ -305,7 +312,7 @@
   .gamebar-edit input:focus{outline:2px solid #fff;outline-offset:1px}
   .gamebar-track{background:rgba(255,255,255,.35);border-radius:20px;height:8px;overflow:hidden}
   .gamebar-fill{background:#fff;height:100%;border-radius:20px;transition:width .4s ease}
-  .todo-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(6px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap}
+  .todo-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(6px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;width:max-content;max-width:calc(100vw - 32px);text-align:center}
   .todo-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   /* Activity history */
@@ -384,9 +391,87 @@
     nav button,.hbtn,.calbtn,.rowbtn,.tbtn,th,.todo .del,.lchip{min-height:40px}
     .card,.todo,tbody tr td{padding-top:12px;padding-bottom:12px}
   }
+  /* ---------- Sign-in gate: covers the whole CRM until a two-factor session exists ---------- */
+  #authGate{position:fixed;inset:0;z-index:1000;background:var(--ink);display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
+  #authGate.hide{display:none!important}
+  .auth-card{background:#fff;border-radius:16px;width:380px;max-width:100%;padding:26px 24px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+  .auth-brand svg{width:34px;height:34px}
+  .auth-brand b{font-size:17px;font-weight:800;letter-spacing:.5px}
+  .auth-brand small{display:block;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.5px}
+  .auth-card h2{font-size:18px;font-weight:800;margin-bottom:6px}
+  .auth-card p{font-size:14px;color:var(--muted);line-height:1.45;margin-bottom:14px}
+  .auth-card .btn{width:100%;padding:12px}
+  .auth-card .btn.sec{background:transparent;color:var(--muted);margin-top:8px}
+  .auth-card .btn:disabled{opacity:.45;cursor:not-allowed}
+  .auth-status{font-size:13.5px;margin-top:12px;min-height:18px;color:var(--muted)}
+  .auth-status.error{color:var(--red)}
+  #authGate .field input{font-size:16px} /* 16px+ stops iPhone Safari zooming in on focus */
+  #authCode,#authSetupCode{font-size:22px!important;letter-spacing:6px;text-align:center}
+  #authSetupQr{width:180px;height:180px;display:block;margin:4px auto 10px}
+  #authSetupSecret{font-family:ui-monospace,Menlo,monospace;font-size:13px;overflow-wrap:anywhere;background:var(--bg);padding:8px 10px;border-radius:8px;margin-bottom:12px;color:var(--ink)}
+  #loadBanner{background:var(--red);color:#fff;font-size:14px;font-weight:600;padding:10px 16px;text-align:center}
+  #loadBanner button{margin-left:10px;background:#fff;color:var(--red);border:none;border-radius:7px;padding:5px 10px;font-weight:700}
 </style>
 </head>
 <body>
+
+<!-- ================= SIGN-IN GATE ================= -->
+<div id="authGate" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <svg viewBox="0 0 100 100" fill="none"><path d="M15 30h55l-12 20h-55z" fill="#F26A21"/><path d="M25 50h55l-12 20h-55z" fill="#F26A21"/><path d="M78 34l14 8-14 8z" fill="#F26A21"/></svg>
+      <div><b>RAPID</b><small>OVEN CLEANING · CRM</small></div>
+    </div>
+    <div id="authChecking"><p>Checking sign-in…</p></div>
+    <div id="authSignIn" class="hide">
+      <h2 id="authTitle">Sign in</h2>
+      <p>Use the shared CRM login. You stay signed in on this device until you sign out.</p>
+      <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+      <div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSignIn()"></div>
+      <button class="btn primary" id="authSignInButton" onclick="authSignIn()">Sign in</button>
+    </div>
+    <div id="authMfa" class="hide">
+      <h2>Enter your code</h2>
+      <p>Open Google Authenticator and type the 6-digit code for Rapid Oven CRM. You only need to do this once on this device.</p>
+      <div class="field"><input id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="6-digit code" onkeydown="if(event.key==='Enter')authVerify()"></div>
+      <button class="btn primary" id="authVerifyButton" onclick="authVerify()">Verify</button>
+      <button class="btn sec" onclick="authSignOut()">Use a different login</button>
+    </div>
+    <div id="authNoFactor" class="hide">
+      <h2>Two-factor isn’t set up</h2>
+      <p>This login doesn’t have its authenticator code set up yet, so the CRM can’t open. Ask Aaron to set up the code.</p>
+      <button class="btn sec" onclick="authSignOut()">Back to sign in</button>
+    </div>
+    <div id="authSetup" class="hide">
+      <h2>Set up the code</h2>
+      <p>Scan this with Google Authenticator (signed in to the shared Google account), then type the 6-digit code it shows. Save the setup key somewhere safe as a backup.</p>
+      <img id="authSetupQr" alt="QR code for setting up the authenticator">
+      <div id="authSetupSecret"></div>
+      <div class="field"><input id="authSetupCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="6-digit code" onkeydown="if(event.key==='Enter')authSetupVerify()"></div>
+      <button class="btn primary" id="authSetupButton" onclick="authSetupVerify()">Finish setup</button>
+      <button class="btn sec" onclick="authSignOut()">Cancel</button>
+    </div>
+    <div id="authStatus" class="auth-status" role="status" aria-live="polite"></div>
+  </div>
+</div>
+<div id="loadBanner" class="hide"></div>
+
+<!-- ================= ACCOUNT MODAL ================= -->
+<div class="overlay" id="accountOverlay">
+  <div class="modal" style="width:420px">
+    <div class="modal-head">
+      <h3>Account</h3>
+      <button class="x" onclick="closeAccountModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="bulk-sms-note" id="accountWho" style="margin:0 0 16px"></p>
+      <button class="btn primary" style="width:100%;margin-bottom:10px" onclick="authSignOut()">Sign out of this device</button>
+      <button class="btn danger" style="width:100%" onclick="authSignOutOthers()">Sign out all other devices</button>
+      <p class="bulk-sms-note" style="margin:12px 0 0">“All other devices” signs out every phone and computer using this login, except this one. They’ll need the password and code again.</p>
+    </div>
+  </div>
+</div>
 
 <header>
   <div class="brand">
@@ -411,7 +496,7 @@
   </nav>
   <div class="spacer"></div>
   <button class="hbtn ghost" onclick="openFeedModal()" title="Connect your Zapier lead feed" aria-label="Lead feed"><span class="ic" id="feedDot">⚪</span><span class="lbl">Lead Feed</span></button>
-  <button class="hbtn ghost" onclick="exportCSV()" title="Export all clients to CSV" aria-label="Export"><span class="ic">⭳</span><span class="lbl">Export</span></button>
+  <button class="hbtn ghost" onclick="openAccountModal()" title="Account and sign out" aria-label="Account"><span class="ic">👤</span><span class="lbl">Account</span></button>
   <button class="hbtn" onclick="openModal()" aria-label="New lead"><span class="ic">+</span><span class="lbl">New Lead</span></button>
 </header>
 
@@ -613,23 +698,6 @@
       <button class="x" onclick="closeBulkSmsModal()" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body">
-      <div id="bulkSmsSignedIn" class="bulk-sms-signedin hide">
-        <span id="bulkSmsSignedInAs"></span>
-        <button class="tbtn" onclick="signOutBulkSms()">Sign out</button>
-      </div>
-      <div id="bulkSmsSignIn" class="hide">
-        <p class="bulk-sms-note" style="margin:0 0 14px">Sign in with your bulk SMS account. The server checks access again before anything is sent.</p>
-        <div class="field full"><label for="bulkSmsEmail">Email</label><input id="bulkSmsEmail" type="email" autocomplete="username"></div>
-        <div class="field full"><label for="bulkSmsPassword">Password</label><input id="bulkSmsPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signInBulkSms()"></div>
-        <button class="btn primary" id="bulkSmsSignInButton" onclick="signInBulkSms()">Sign in</button>
-      </div>
-      <div id="bulkSmsMfa" class="hide">
-        <p id="bulkSmsMfaIntro" class="bulk-sms-note" style="margin:0 0 12px"></p>
-        <img id="bulkSmsMfaQr" class="hide" alt="QR code for setting up two-factor sign-in" style="width:180px;height:180px;display:block;margin-bottom:8px">
-        <div id="bulkSmsMfaSecret" class="bulk-sms-note hide" style="margin-bottom:12px;overflow-wrap:anywhere"></div>
-        <div class="field full"><label for="bulkSmsMfaCode">6-digit code</label><input id="bulkSmsMfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" onkeydown="if(event.key==='Enter')verifyBulkSmsMfa()"></div>
-        <button class="btn primary" id="bulkSmsMfaButton" onclick="verifyBulkSmsMfa()">Verify</button>
-      </div>
       <div id="bulkSmsComposer" class="hide">
         <div class="field full">
           <label id="bulkSmsRecipientLabel">Recipients</label>
@@ -825,9 +893,12 @@
 /* ---------- Supabase ---------- */
 const SUPABASE_URL = 'https://haarvltpfcbixqbwkxpl.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhYXJ2bHRwZmNiaXhxYndreHBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4ODExMzAsImV4cCI6MjA5OTQ1NzEzMH0.vqLvv_N_tTsRgngxeOAUUIZowmfilvQrfFG6srkRLQM';
-const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-/* Keep SMS sign-in separate so it cannot change the CRM data client's anonymous access context. */
-const _smsSb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {auth:{storageKey:'rapid-oven-crm-sms-auth',persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+/* One client and one shared login (password + authenticator code) for the whole CRM, bulk SMS included.
+   The session is kept in localStorage, so a device stays signed in until someone signs out.
+   Row Level Security only serves data to that login at aal2 (after the code), so nothing loads until then. */
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+/* Bulk SMS used to have its own sign-in; clear any session it left on this device. */
+try{localStorage.removeItem('rapid-oven-crm-sms-auth');}catch(_){}
 
 /* ---------- Stage config ---------- */
 const STAGES = [
@@ -854,7 +925,7 @@ const BULK_SMS_SELECTION_KEY='rapidCrmBulkSmsSelected';
 function readBulkSmsSelection(){try{const ids=JSON.parse(sessionStorage.getItem(BULK_SMS_SELECTION_KEY)||'[]');return Array.isArray(ids)?ids:[]}catch(_){return[]}}
 let selectedClientIds=new Set(readBulkSmsSelection().map(String));
 const BULK_SMS_BATCH_KEY='rapidCrmBulkSmsBatch';
-let bulkSmsSending=false,bulkSmsUser=null,bulkSmsStep='',bulkSmsTemplates=[],bulkSmsReviewData=null,bulkSmsMfaFactorId=null;
+let bulkSmsSending=false,bulkSmsStep='',bulkSmsTemplates=[],bulkSmsReviewData=null;
 let projects = [];
 let todos = [];
 let staff = ['Staff 1','Staff 2','Staff 3','Staff 4'];
@@ -872,6 +943,9 @@ let tpls = [
   {name:'Closed — Lost',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
 ];
 let loading = true;
+/* Writes are refused until the initial load succeeds, so a failed or signed-out load can never
+   overwrite real data with defaults (e.g. saveConfig wiping templates and staff names). */
+let loadOk = false;
 
 function uid(){return 'l'+Date.now()+Math.random().toString(36).slice(2,6);}
 function logAct(l,text){(l.history=l.history||[]).push({ts:Date.now(),text});if(l.history.length>60)l.history=l.history.slice(-60);}
@@ -901,7 +975,11 @@ const notArchived=q=>q.or('data->archived.is.null,data->archived.not.eq.true');
 let archivedLoaded=false,archivedLoading=false;
 async function fetchActiveLeadRows(){return fetchPaged('leads',notArchived);}
 async function fetchArchivedLeadRows(){return fetchPaged('leads',q=>q.filter('data->archived','eq','true'));}
-function rowsToLeads(rows){return rows.map(r=>{const o=r.data||{};o.id=r.id;if(!o.history)o.history=[];return o;});}
+/* Ids are written into onclick="…('id')" attributes all over the page, so only plain ids are ever rendered. */
+const SAFE_ID=/^[A-Za-z0-9_-]{1,120}$/;
+function validRows(rows){return rows.filter(r=>{if(SAFE_ID.test(String(r.id)))return true;console.warn('Skipped a row with an unsafe id:',r.id);return false;});}
+function rowsToObjs(rows){return validRows(rows).map(r=>{const o=r.data||{};o.id=r.id;return o;});}
+function rowsToLeads(rows){return rowsToObjs(rows).map(o=>{if(!o.history)o.history=[];return o;});}
 async function ensureArchivedLoaded(){
   if(archivedLoaded||archivedLoading)return;
   archivedLoading=true;
@@ -919,17 +997,31 @@ async function ensureArchivedLoaded(){
     if(el)el.textContent='Couldn\'t load full history — showing recent clients only.';
   }finally{archivedLoading=false;}
 }
+/* Every CRM write goes through these. A failed write shows one toast and re-checks the sign-in,
+   because once the database is locked a lost session makes writes fail rather than reach the wrong place. */
+let saveFailedAt=0,sessionCheckAt=0;
+function saveFailed(e){
+  if(e)console.warn('Save failed:',e);
+  if(Date.now()-saveFailedAt>4000){saveFailedAt=Date.now();showToast('⚠️ Not saved — reload or sign in again');}
+  checkSessionSoon();
+}
+function checkSessionSoon(){
+  if(Date.now()-sessionCheckAt<10000)return;
+  sessionCheckAt=Date.now();
+  // Only a definite answer counts: an error (e.g. offline while refreshing) leaves the page alone.
+  _sb.auth.mfa.getAuthenticatorAssuranceLevel().then(({data,error})=>{
+    if(!error&&data&&data.currentLevel!=='aal2')location.reload();
+  }).catch(()=>{});
+}
 async function upsertRow(table,id,data){
+  if(!loadOk){saveFailed();throw new Error('CRM data did not load, so writes are blocked');}
   const {error}=await _sb.from(table).upsert({id,data,updated_at:new Date().toISOString()},{onConflict:'id'});
-  if(error)throw error;
+  if(error){saveFailed(error);throw error;}
 }
 async function deleteRow(table,id){
+  if(!loadOk){saveFailed();throw new Error('CRM data did not load, so writes are blocked');}
   const {error}=await _sb.from(table).delete().eq('id',id);
-  if(error)throw error;
-}
-async function loadAll(table,mapFn){
-  const rows=await fetchAll(table);
-  return rows.map(r=>{const o=r.data||{};o.id=r.id;return o;}).map(mapFn);
+  if(error){saveFailed(error);throw error;}
 }
 function subscribe(table,cb){
   return _sb.channel(table+'-sync')
@@ -937,41 +1029,32 @@ function subscribe(table,cb){
     .subscribe();
 }
 
-/* ---------- Load all data ---------- */
+/* ---------- Load all data (only runs after sign-in with the code) ---------- */
+function showLoadBanner(msg){
+  const el=document.getElementById('loadBanner');
+  el.innerHTML=esc(msg)+' <button onclick="location.reload()">Reload</button>';
+  el.classList.remove('hide');
+}
 async function init(){
   try{
     // Load leads (live pipeline only — archived history loads on demand)
     leads=rowsToLeads(await fetchActiveLeadRows());
-    if(!leads.length){
-      leads=seed();
-      for(const l of leads)await syncLead(l);
-    }
-    // Load projects
-    const pra=await fetchAll('projects');
-    projects=pra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
-    if(!projects.length){
-      projects=seedProjects();
-      for(const p of projects)await saveProject(p);
-    }
-    // Load todos
-    const tra=await fetchAll('todos');
-    todos=tra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
-    if(!todos.length){
-      todos=seedTodos();
-      await saveTodos();
-    }
-    // Load config
+    // There are always live leads; an empty answer means the database refused (e.g. the sign-in lapsed),
+    // so treat it as a failed load rather than an empty CRM.
+    if(!leads.length)throw new Error('No leads came back from the database');
+    projects=rowsToObjs(await fetchAll('projects'));
+    todos=rowsToObjs(await fetchAll('todos'));
     const cfg=await fetchAll('config');
     const cfgData=cfg[0]&&cfg[0].data||{};
     if(cfgData.staff)staff=cfgData.staff;
     if(cfgData.tpls)tpls=cfgData.tpls;
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
     if(cfgData.todoXp)todoXp=cfgData.todoXp;
+    loadOk=true;
   }catch(e){
-    console.warn('Supabase load failed, using seed data:',e);
-    leads=seed();
-    projects=seedProjects();
-    todos=seedTodos();
+    console.warn('Supabase load failed:',e);
+    leads=[];projects=[];todos=[];
+    showLoadBanner('Couldn’t load the CRM data, so nothing can be saved right now. Reload, or sign out and in again.');
   }
   loading=false;
   fillStageSelects();
@@ -980,7 +1063,7 @@ async function init(){
   fillTodoDaySelect();
   renderBoard();
   renderTodoBadge();
-  startRealtime();
+  if(loadOk)startRealtime();
 }
 
 /* ---------- Real-time sync ---------- */
@@ -988,25 +1071,30 @@ let syncTimer=null;
 function startRealtime(){
   subscribe('leads',()=>{debounceSync('leads',async()=>{
     const fresh=rowsToLeads(await fetchActiveLeadRows());
+    // An empty answer means the database refused (sign-in lapsed), not that every lead vanished: keep the board.
+    if(!fresh.length&&activeLeads().length){checkSessionSoon();return;}
     // keep any archived history already loaded for the Clients tab
     leads=archivedLoaded?fresh.concat(leads.filter(l=>l.archived)):fresh;
     if(!loading)refreshActive();
     renderTodoBadge();
   });});
   subscribe('projects',()=>{debounceSync('projects',async()=>{
-    const pra=await fetchAll('projects');
-    projects=pra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
+    const fresh=rowsToObjs(await fetchAll('projects'));
+    if(!fresh.length&&projects.length){checkSessionSoon();return;}
+    projects=fresh;
     if(!loading&&document.getElementById('page-projects').classList.contains('active'))renderProjects();
   });});
   subscribe('todos',()=>{debounceSync('todos',async()=>{
-    const tra=await fetchAll('todos');
-    todos=tra.map(r=>{const o=r.data||{};o.id=r.id;return o;});
+    const fresh=rowsToObjs(await fetchAll('todos'));
+    if(!fresh.length&&todos.length){checkSessionSoon();return;}
+    todos=fresh;
     if(!loading&&document.getElementById('page-todo').classList.contains('active'))renderTodos();
     renderTodoBadge();
   });});
   subscribe('config',()=>{debounceSync('config',async()=>{
     const cfg=await fetchAll('config');
-    const cfgData=cfg[0]&&cfg[0].data||{};
+    if(!cfg.length){checkSessionSoon();return;}
+    const cfgData=cfg[0].data||{};
     if(cfgData.staff)staff=cfgData.staff;
     if(cfgData.tpls)tpls=cfgData.tpls;
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
@@ -1030,44 +1118,7 @@ function debounceSync(key,fn){
   },300);
 }
 
-/* ---------- Seed data ---------- */
-function seed(){
-  const now=Date.now(),D=86400000,ds=t=>dToStr(t);
-  const h=(t,txt)=>({ts:t,text:txt});
-  return [
-    {id:uid(),name:'Sarah Thompson',phone:'0412 334 556',email:'sarah.t@email.com',service:'Oven Clean',suburb:'Cronulla',address:'12 Gerrale St',value:180,source:'Website',stage:'new',notes:'Wants weekend booking. Double oven.',createdAt:now-2*3600000,followUp:ds(now),history:[h(now-2*3600000,'Lead created — Website')]},
-    {id:uid(),name:'Michael Nguyen',phone:'0433 210 998',email:'mnguyen@email.com',service:'BBQ Clean',suburb:'Miranda',value:150,source:'Meta / Facebook',stage:'new',notes:'6-burner BBQ, pre-Christmas.',createdAt:now-6*3600000,history:[h(now-6*3600000,'Lead created — Meta / Facebook')]},
-    {id:uid(),name:'Priya Sharma',phone:'0401 556 223',email:'priya.s@email.com',service:'Full Kitchen',suburb:'Hurstville',value:420,source:'Google',stage:'contacted',notes:'Called, left voicemail. Try again tomorrow.',createdAt:now-1*D,followUp:ds(now+1*D),history:[h(now-1*D,'Lead created — Google'),h(now-20*3600000,'Moved to Contacted'),h(now-20*3600000,'Follow-up set for tomorrow')]},
-    {id:uid(),name:'James O\'Brien',phone:'0455 887 001',email:'jobrien@email.com',service:'Rangehood Clean',suburb:'Sutherland',value:120,source:'Referral',stage:'followup',notes:'Asked to call back after 15th.',createdAt:now-3*D,followUp:ds(now-1*D),history:[h(now-3*D,'Lead created — Referral'),h(now-2*D,'Moved to Follow Up')]},
-    {id:uid(),name:'Emma Wilson',phone:'0422 665 447',email:'emmaw@email.com',service:'Oven Clean',suburb:'Caringbah',value:160,source:'Website',stage:'quoted',notes:'Quote sent via email. Awaiting reply.',createdAt:now-4*D,followUp:ds(now+2*D),history:[h(now-4*D,'Lead created — Website'),h(now-3*D,'Moved to Quoted')]},
-    {id:uid(),name:'David Chen',phone:'0466 223 118',email:'dchen@email.com',service:'Full Kitchen',suburb:'Kogarah',address:'3/45 Princes Hwy',value:390,source:'Repeat client',stage:'won',notes:'Paid deposit.',createdAt:now-5*D,jobDate:ds(now+2*D),jobTime:'09:00',assignedTo:'s1',history:[h(now-5*D,'Lead created — Repeat client'),h(now-4*D,'Moved to Closed — Won'),h(now-4*D,'Job booked')]},
-    {id:uid(),name:'Lucy Martin',phone:'0400 998 776',email:'lucym@email.com',service:'Stovetop Clean',suburb:'Sylvania',value:110,source:'Meta / Facebook',stage:'won',notes:'Completed. 5-star review left.',createdAt:now-8*D,jobDate:ds(now-2*D),jobTime:'13:30',history:[h(now-8*D,'Lead created — Meta / Facebook'),h(now-6*D,'Moved to Closed — Won')]},
-    {id:uid(),name:'Tom Baker',phone:'0411 445 990',email:'tbaker@email.com',service:'BBQ Clean',suburb:'Engadine',value:140,source:'Google',stage:'lost',notes:'Went with cheaper quote.',createdAt:now-10*D,history:[h(now-10*D,'Lead created — Google'),h(now-7*D,'Moved to Closed — Lost')]},
-  ];
-}
-function seedProjects(){
-  const now=Date.now(),D=86400000;
-  return[
-    {id:uid(),name:'End-of-lease ovens — Ray White',client:'Ray White Cronulla',value:2400,status:'active',due:dToStr(now+14*D),notes:'12 units to schedule across the month.',createdAt:now},
-    {id:uid(),name:'Strata BBQ area deep clean',client:'Sutherland Strata Group',value:950,status:'planning',due:dToStr(now+30*D),notes:'Waiting on committee approval.',createdAt:now},
-  ];
-}
-function seedTodos(){
-  const now=Date.now();
-  return[
-    {id:uid(),text:'Call back James O\'Brien about rangehood quote',day:curDow(),done:false,createdAt:now},
-    {id:uid(),text:'Order degreaser + steel wool refills',day:'',done:false,createdAt:now-1},
-    {id:uid(),text:'Post before/after photos to Facebook page',day:'fri',done:false,createdAt:now-2},
-  ];
-}
-
 /* ---------- Persist helpers ---------- */
-async function saveLeads(){
-  await Promise.all(leads.map(l=>{
-    const {id,...data}=l;
-    return upsertRow('leads',id,data);
-  }));
-}
 async function syncLead(l){
   const {id,...data}=l;
   await upsertRow('leads',id,data);
@@ -1075,24 +1126,12 @@ async function syncLead(l){
 async function deleteLeadDb(id){
   await deleteRow('leads',id);
 }
-async function saveProjects(){
-  await Promise.all(projects.map(p=>{
-    const {id,...data}=p;
-    return upsertRow('projects',id,data);
-  }));
-}
 async function saveProject(p){
   const {id,...data}=p;
   await upsertRow('projects',id,data);
 }
 async function deleteProjectDb(id){
   await deleteRow('projects',id);
-}
-async function saveTodos(){
-  await Promise.all(todos.map(t=>{
-    const {id,...data}=t;
-    return upsertRow('todos',id,data);
-  }));
 }
 async function saveTodo(t){
   const {id,...data}=t;
@@ -1102,13 +1141,16 @@ async function deleteTodoDb(id){
   await deleteRow('todos',id);
 }
 async function saveConfig(){
+  // Never write the in-memory defaults over the real settings row when the load failed.
+  if(!loadOk){saveFailed();return;}
   const data={staff,tpls,jobTarget,todoXp};
-  const cfg=await fetchAll('config');
-  if(cfg.length){
-    await _sb.from('config').update({data,updated_at:new Date().toISOString()}).eq('id',cfg[0].id);
-  }else{
-    await _sb.from('config').insert({id:'default',data,updated_at:new Date().toISOString()});
-  }
+  try{
+    const cfg=await fetchAll('config');
+    const {error}=cfg.length
+      ?await _sb.from('config').update({data,updated_at:new Date().toISOString()}).eq('id',cfg[0].id)
+      :await _sb.from('config').insert({id:'default',data,updated_at:new Date().toISOString()});
+    if(error)throw error;
+  }catch(e){saveFailed(e);}
 }
 function saveJobTarget(v){
   const n=parseInt(v,10);
@@ -1162,7 +1204,7 @@ function fmtDT(ts){
   const ap=hh>=12?'pm':'am';hh=hh%12||12;
   return day+', '+hh+':'+mm+ap;
 }
-function esc(s){return (s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));}
+function esc(s){return String(s||'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));}
 function telLink(p,stop){return p?`<a class=\"tel\" draggable=\"false\" href=\"tel:${p.replace(/[^\\d+]/g,'')}\"${stop?' onclick=\"event.stopPropagation()\"':''}>${esc(p)}</a>`:'';}
 function mapsLink(l){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([l.address,l.suburb,'NSW'].filter(Boolean).join(', '));}
 function placeLink(l,stop){
@@ -1724,7 +1766,7 @@ function showToast(msg){
   el.textContent=msg;
   el.classList.add('show');
   clearTimeout(todoToastTimer);
-  todoToastTimer=setTimeout(()=>el.classList.remove('show'),1600);
+  todoToastTimer=setTimeout(()=>el.classList.remove('show'),Math.max(1600,msg.length*70));
 }
 function awardXp(n){
   const before=levelOf(todoXp);
@@ -2200,7 +2242,7 @@ function writeBulkSmsBatch(v){try{if(v)sessionStorage.setItem(BULK_SMS_BATCH_KEY
 function newBulkSmsKey(){return 'b-'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));}
 async function callBulkSms(action,body={}){
   try{
-    const {data,error}=await _smsSb.functions.invoke('bulk-sms',{body:{action,...body}});
+    const {data,error}=await _sb.functions.invoke('bulk-sms',{body:{action,...body}});
     if(!error)return{ok:true,status:200,data};
     let status=0,payload=null;
     if(error.context&&typeof error.context.json==='function'){
@@ -2232,21 +2274,17 @@ function setBulkSmsStatus(message,type=''){
 function showBulkSmsStep(step){
   bulkSmsStep=step;
   const on=(id,v)=>document.getElementById(id).classList.toggle('hide',!v);
-  on('bulkSmsSignIn',step==='signin');
-  on('bulkSmsMfa',step==='mfa');
   on('bulkSmsComposer',step==='compose');
   on('bulkSmsReview',step==='review');
   on('bulkSmsResult',step==='result');
-  on('bulkSmsSignedIn',!!bulkSmsUser&&step!=='signin');
   on('bulkSmsReviewButton',step==='compose');
   on('bulkSmsBackButton',step==='review');
   on('bulkSmsSendButton',step==='review');
-  document.getElementById('bulkSmsSignedInAs').textContent=bulkSmsUser?`Signed in as ${bulkSmsUser.email||'bulk SMS user'}`:'';
   document.getElementById('bulkSmsCloseButton').textContent=step==='result'?'Close':'Cancel';
   if(step==='compose')renderBulkSmsPreview();
 }
 function setBulkSmsBusy(busy){
-  ['bulkSmsReviewButton','bulkSmsSendButton','bulkSmsBackButton','bulkSmsSaveTemplateButton','bulkSmsTemplate','bulkSmsText','bulkSmsMfaButton','bulkSmsSignInButton']
+  ['bulkSmsReviewButton','bulkSmsSendButton','bulkSmsBackButton','bulkSmsSaveTemplateButton','bulkSmsTemplate','bulkSmsText']
     .forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=busy;});
   document.getElementById('bulkSmsCloseButton').disabled=busy&&bulkSmsSending;
   if(!busy){renderBulkSmsPreview();if(bulkSmsStep==='review')updateBulkSmsSendButton();}
@@ -2260,95 +2298,30 @@ function invalidateBulkSmsReview(){
     setBulkSmsStatus('The ticked clients or the message changed, so review again before sending.','error');
   }
 }
+/* Bulk SMS rides on the CRM sign-in. If the server says that sign-in isn't good enough (expired, no code, or not
+   the allowed login), nothing was sent; the fix is to sign in to the CRM again. */
 function handleBulkSmsError(r){
-  if(r.data&&r.data.code==='mfa_required'){startBulkSmsMfa();setBulkSmsStatus(r.error,'error');return;}
-  if(r.status===401){bulkSmsUser=null;showBulkSmsStep('signin');setBulkSmsStatus(r.error,'error');return;}
+  // 403 is a real refusal (login not allowed for bulk SMS, or wrong site): show the server's reason, not "sign in again".
+  if(r.status===401||(r.data&&r.data.code==='mfa_required')){
+    setBulkSmsStatus('Your sign-in needs refreshing before bulk SMS can be used. Nothing was sent. Close this, reload the CRM and sign in again.','error');
+    checkSessionSoon();
+    return;
+  }
   setBulkSmsStatus(r.error,'error');
 }
 
-/* ----- Sign in + two-factor ----- */
+/* ----- Open / close (no separate sign-in: the CRM gate already required the password and code) ----- */
 async function openBulkSmsModal(){
   if(!selectedClientIds.size)return;
   document.getElementById('bulkSmsOverlay').classList.add('open');
   setBulkSmsStatus('');
   renderBulkSmsButton();
-  await refreshBulkSmsAuth();
+  await enterBulkSmsComposer();
 }
 function closeBulkSmsModal(){
   if(bulkSmsSending)return;
   document.getElementById('bulkSmsOverlay').classList.remove('open');
-  document.getElementById('bulkSmsPassword').value='';
-  document.getElementById('bulkSmsMfaCode').value='';
   bulkSmsStep='';
-}
-async function refreshBulkSmsAuth(){
-  const {data,error}=await _smsSb.auth.getSession();
-  bulkSmsUser=(!error&&data.session)?data.session.user:null;
-  if(!bulkSmsUser){showBulkSmsStep('signin');return;}
-  const aal=await _smsSb.auth.mfa.getAuthenticatorAssuranceLevel();
-  if(!aal.error&&aal.data.currentLevel==='aal2'){await enterBulkSmsComposer();return;}
-  await startBulkSmsMfa();
-}
-async function signInBulkSms(){
-  const email=document.getElementById('bulkSmsEmail').value.trim();
-  const password=document.getElementById('bulkSmsPassword').value;
-  if(!email||!password){setBulkSmsStatus('Enter your email and password.','error');return;}
-  setBulkSmsBusy(true);setBulkSmsStatus('Signing in…');
-  try{
-    const {error}=await _smsSb.auth.signInWithPassword({email,password});
-    if(error)throw error;
-    document.getElementById('bulkSmsPassword').value='';
-    setBulkSmsStatus('');
-    await refreshBulkSmsAuth();
-  }catch(e){
-    setBulkSmsStatus(e.message||'Sign-in failed. Check your details and try again.','error');
-  }finally{setBulkSmsBusy(false);}
-}
-async function startBulkSmsMfa(){
-  showBulkSmsStep('mfa');
-  const intro=document.getElementById('bulkSmsMfaIntro');
-  const qr=document.getElementById('bulkSmsMfaQr');
-  const secret=document.getElementById('bulkSmsMfaSecret');
-  qr.classList.add('hide');secret.classList.add('hide');qr.removeAttribute('src');
-  bulkSmsMfaFactorId=null;
-  const {data,error}=await _smsSb.auth.mfa.listFactors();
-  if(error){setBulkSmsStatus('Could not check two-factor setup: '+error.message,'error');return;}
-  const verified=(data.totp||[]).find(f=>f.status==='verified');
-  if(verified){
-    bulkSmsMfaFactorId=verified.id;
-    intro.textContent='Enter the 6-digit code from your authenticator app.';
-  }else{
-    for(const f of (data.all||[]).filter(f=>f.factor_type==='totp'&&f.status!=='verified')){
-      await _smsSb.auth.mfa.unenroll({factorId:f.id});
-    }
-    const en=await _smsSb.auth.mfa.enroll({factorType:'totp',friendlyName:'Bulk SMS'});
-    if(en.error){setBulkSmsStatus('Could not start two-factor setup: '+en.error.message,'error');return;}
-    bulkSmsMfaFactorId=en.data.id;
-    intro.textContent='Bulk SMS needs two-factor sign-in. Scan this QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, etc.), then enter the 6-digit code it shows. You only do this once.';
-    qr.src=en.data.totp.qr_code;qr.classList.remove('hide');
-    secret.textContent='Can’t scan it? Type this key into the app instead: '+en.data.totp.secret;
-    secret.classList.remove('hide');
-  }
-  document.getElementById('bulkSmsMfaCode').focus();
-}
-async function verifyBulkSmsMfa(){
-  const input=document.getElementById('bulkSmsMfaCode');
-  const code=input.value.replace(/\s/g,'');
-  if(!/^\d{6}$/.test(code)){setBulkSmsStatus('Enter the 6-digit code from your authenticator app.','error');return;}
-  if(!bulkSmsMfaFactorId){await startBulkSmsMfa();return;}
-  setBulkSmsBusy(true);setBulkSmsStatus('Checking code…');
-  const {error}=await _smsSb.auth.mfa.challengeAndVerify({factorId:bulkSmsMfaFactorId,code});
-  setBulkSmsBusy(false);
-  if(error){setBulkSmsStatus('That code didn’t work. Wait for the next code and try again.','error');return;}
-  input.value='';setBulkSmsStatus('');
-  await enterBulkSmsComposer();
-}
-async function signOutBulkSms(){
-  if(bulkSmsSending)return;
-  await _smsSb.auth.signOut();
-  bulkSmsUser=null;bulkSmsReviewData=null;
-  showBulkSmsStep('signin');
-  setBulkSmsStatus('Signed out.');
 }
 
 /* ----- Compose ----- */
@@ -2714,39 +2687,6 @@ async function geocodeQueue(list){
   if(found&&document.getElementById('page-map').classList.contains('active'))renderMap();
 }
 
-/* ---------- Export ---------- */
-function exportCSV(){
-  const cols=['name','phone','email','service','suburb','address','value','source','stage','followUp','jobDate','jobTime','assignedTo','notes','createdAt'];
-  const head=['Name','Phone','Email','Service','Suburb','Address','Value','Source','Stage','Follow-up','Job Date','Job Time','Assigned To','Notes','Date Added'];
-  const rows=leads.map(l=>cols.map(c=>{
-    let v=c==='createdAt'?fdate(l[c]):c==='stage'?stageMap[l[c]].name:c==='assignedTo'?staffName(l[c]):(l[c]??'');
-    v=(''+v).replace(/\"/g,'""');
-    return /[\",\\n]/.test(v)?`"${v}"`:v;
-  }).join(','));
-  const csv=[head.join(','),...rows].join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='rapid-oven-clients-'+new Date().toISOString().slice(0,10)+'.csv';
-  a.click();
-}
-
-/* ---------- Public API for automated lead intake ---------- */
-function intakeFromHash(){
-  if(location.hash.startsWith('#addlead=')){
-    try{
-      const obj=JSON.parse(decodeURIComponent(location.hash.slice(9)));
-      if(obj&&obj.name){
-        const nl={id:uid(),createdAt:Date.now(),service:'Oven Clean',source:'Website',value:'',suburb:'',address:'',phone:'',email:'',notes:'',history:[],...obj,stage:'new'};
-        logAct(nl,'Lead received automatically — '+nl.source);
-        leads.push(nl);
-        syncLead(nl);
-      }
-    }catch(e){}
-    history.replaceState(null,'',location.pathname);
-  }
-}
-
 /* ---------- Zapier lead feed (Google Sheet polling) ---------- */
 const FEED_KEY='rapid_crm_feed_v1';
 let feedCfg=JSON.parse(localStorage.getItem(FEED_KEY)||'null');
@@ -2875,9 +2815,124 @@ function openFeedModal(){
 }
 function closeFeedModal(){document.getElementById('overlay3').classList.remove('open');}
 
+/* ---------- Sign-in gate ----------
+   Password, then the 6-digit authenticator code, once per device. Nothing loads until the session is aal2.
+   The gate never sets up a code by itself: with no code on the login it says "ask Aaron". Aaron sets one up
+   deliberately by opening the CRM with #setup-2fa on the end of the address. */
+const AUTH_STEPS=['authChecking','authSignIn','authMfa','authNoFactor','authSetup'];
+let authFactorId=null,unlocked=false;
+function authStep(step){
+  AUTH_STEPS.forEach(id=>document.getElementById(id).classList.toggle('hide',id!==step));
+  document.getElementById('authGate').classList.remove('hide');
+}
+function authStatus(msg,type=''){
+  const el=document.getElementById('authStatus');
+  el.textContent=msg||'';
+  el.className='auth-status'+(type?' '+type:'');
+}
+function authBusy(busy){['authSignInButton','authVerifyButton','authSetupButton'].forEach(id=>{document.getElementById(id).disabled=busy;});}
+function focusLater(id){setTimeout(()=>{const el=document.getElementById(id);if(el)el.focus();},50);}
+async function bootAuth(){
+  authStep('authChecking');
+  const {data,error}=await _sb.auth.getSession();
+  if(error&&error.name==='AuthRetryableFetchError'){
+    // No connection while refreshing a saved sign-in; supabase-js keeps the sign-in, so just try again.
+    authStatus('Can’t reach the server. Check the connection — retrying…','error');
+    setTimeout(bootAuth,5000);
+    return;
+  }
+  // Any other error means the saved sign-in is no longer valid (e.g. "Sign out all other devices"): sign in again.
+  if(error||!data.session){authStatus('');authStep('authSignIn');focusLater('authEmail');return;}
+  authStatus('');
+  await afterPassword();
+}
+async function afterPassword(){
+  const aal=await _sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  if(!aal.error&&aal.data.currentLevel==='aal2'){unlock();return;}
+  const {data,error}=await _sb.auth.mfa.listFactors();
+  if(error){authStep('authSignIn');authStatus('Couldn’t check the code setup: '+error.message,'error');return;}
+  const verified=(data.totp||[]).find(f=>f.status==='verified');
+  if(verified){authFactorId=verified.id;authStep('authMfa');focusLater('authCode');return;}
+  if(location.hash==='#setup-2fa'){await startAuthSetup(data);return;}
+  authStep('authNoFactor');
+}
+async function authSignIn(){
+  const email=document.getElementById('authEmail').value.trim();
+  const password=document.getElementById('authPassword').value;
+  if(!email||!password){authStatus('Enter the email and password.','error');return;}
+  authBusy(true);authStatus('Signing in…');
+  const {error}=await _sb.auth.signInWithPassword({email,password});
+  authBusy(false);
+  if(error){authStatus(/invalid login/i.test(error.message)?'That email or password isn’t right.':error.message,'error');return;}
+  document.getElementById('authPassword').value='';
+  authStatus('');
+  await afterPassword();
+}
+async function verifyCode(inputId){
+  const input=document.getElementById(inputId);
+  const code=input.value.replace(/\s/g,'');
+  if(!/^\d{6}$/.test(code)){authStatus('Enter the 6-digit code from Google Authenticator.','error');return false;}
+  if(!authFactorId){await afterPassword();return false;}
+  authBusy(true);authStatus('Checking code…');
+  const {error}=await _sb.auth.mfa.challengeAndVerify({factorId:authFactorId,code});
+  authBusy(false);
+  if(error){authStatus('That code didn’t work. Wait for the next code and try again.','error');input.select();return false;}
+  input.value='';authStatus('');
+  return true;
+}
+async function authVerify(){if(await verifyCode('authCode'))unlock();}
+async function startAuthSetup(factors){
+  // Clear any half-finished attempt so a fresh QR code can be made.
+  for(const f of (factors.all||[]).filter(f=>f.factor_type==='totp'&&f.status!=='verified')){
+    await _sb.auth.mfa.unenroll({factorId:f.id});
+  }
+  const en=await _sb.auth.mfa.enroll({factorType:'totp',friendlyName:'Rapid Oven CRM',issuer:'Rapid Oven CRM'});
+  if(en.error){authStep('authNoFactor');authStatus('Couldn’t start setup: '+en.error.message,'error');return;}
+  authFactorId=en.data.id;
+  document.getElementById('authSetupQr').src=en.data.totp.qr_code;
+  document.getElementById('authSetupSecret').textContent='Setup key: '+en.data.totp.secret;
+  authStep('authSetup');
+  focusLater('authSetupCode');
+}
+async function authSetupVerify(){
+  if(!(await verifyCode('authSetupCode')))return;
+  document.getElementById('authSetupQr').removeAttribute('src');
+  document.getElementById('authSetupSecret').textContent='';
+  history.replaceState(null,'',location.pathname);
+  unlock();
+}
+function unlock(){
+  if(unlocked)return;
+  unlocked=true;
+  document.getElementById('authGate').classList.add('hide');
+  init();
+}
+/* Normal sign-out only affects this device: the login is shared, and a global sign-out would log out every staff phone. */
+async function authSignOut(){
+  try{await _sb.auth.signOut({scope:'local'});}catch(_){}
+  location.replace(location.pathname); // reload, so no customer data stays in memory
+}
+async function authSignOutOthers(){
+  if(!confirm('Sign out every other phone and computer using this login? This device stays signed in.'))return;
+  const {error}=await _sb.auth.signOut({scope:'others'});
+  if(error){showToast('⚠️ Couldn’t sign out other devices: '+error.message);return;}
+  closeAccountModal();
+  showToast('Other devices signed out. Ones open right now can take up to an hour to drop off.');
+}
+async function openAccountModal(){
+  const {data}=await _sb.auth.getSession();
+  document.getElementById('accountWho').textContent=data.session?`Signed in as ${data.session.user.email} on this device.`:'';
+  document.getElementById('accountOverlay').classList.add('open');
+}
+function closeAccountModal(){document.getElementById('accountOverlay').classList.remove('open');}
+/* Signed out elsewhere ("Sign out all other devices"), or the saved sign-in can no longer be refreshed: back to the gate. */
+_sb.auth.onAuthStateChange(event=>{
+  if(event==='SIGNED_OUT'&&unlocked)setTimeout(()=>location.reload(),0);
+});
+
 /* ---------- Init ---------- */
-init();
-intakeFromHash();
+bootAuth();
+document.getElementById('accountOverlay').addEventListener('click',e=>{if(e.target.id==='accountOverlay')closeAccountModal();});
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
 document.getElementById('overlay2').addEventListener('click',e=>{if(e.target.id==='overlay2')closeProject();});
 document.getElementById('todoText').addEventListener('keydown',e=>{if(e.key==='Enter')addTodo();});
@@ -2886,6 +2941,7 @@ document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
   const s=document.getElementById('addrSug');
   if(s&&!s.classList.contains('hide')){hideSug();return;}
+  if(document.getElementById('accountOverlay').classList.contains('open')){closeAccountModal();return;}
   if(document.getElementById('overlay2').classList.contains('open')){closeProject();return;}
   closeModal();
 });
