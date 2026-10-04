@@ -1418,12 +1418,15 @@ function fuCellSelect(l){
   const t=todayStr();
   const closed=TERMINAL_STAGES.includes(l.stage);
   if(closed)return l.followUp?`<span style="color:var(--muted)">${fmtD(l.followUp)}</span>`:'<span style="color:var(--muted)">—</span>';
-  const opts=['','Today','Tomorrow','+3 days','+1 week','+2 weeks','+1 month'].map((label,i)=>{
-    const d=new Date();d.setDate(d.getDate()+i);
-    const val=i===0?'':dToStr(d);
-    const sel=l.followUp===val?' selected':'';
-    return `<option value="${val}"${sel}>${label}</option>`;
-  }).join('');
+  const presets=[['',null],['Today',0],['Tomorrow',1],['+3 days',3],['+1 week',7],['+2 weeks',14],['+1 month','month']].map(([label,add])=>{
+    if(add===null)return{label,val:''};
+    const d=new Date();
+    if(add==='month')d.setMonth(d.getMonth()+1);else d.setDate(d.getDate()+add);
+    return{label,val:dToStr(d)};
+  });
+  // A follow-up set elsewhere (e.g. the lead modal) won't match a preset; show it rather than a blank box.
+  const custom=l.followUp&&!presets.some(p=>p.val===l.followUp)?`<option value="${esc(l.followUp)}" selected>${esc(fmtD(l.followUp))}</option>`:'';
+  const opts=custom+presets.map(p=>`<option value="${p.val}"${l.followUp===p.val?' selected':''}>${p.label}</option>`).join('');
   return `<select class="stagesel" onchange="event.stopPropagation();fuCellChange('${l.id}',this.value)" onclick="event.stopPropagation()" style="max-width:100px">
     ${opts}</select>`;
 }
