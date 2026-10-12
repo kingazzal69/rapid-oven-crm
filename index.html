@@ -1627,6 +1627,16 @@ function ago(ts){
   const d=Math.floor(s/86400);return d===1?'yesterday':d+'d ago';
 }
 function fdate(ts){return new Date(ts).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}
+/* Search matches every typed word in any order, ignoring case and apostrophes: ServiceM8 names arrive as
+   "O'Neill, Aaron", so "aaron oneill" must still find them. Phones also match typed with spaces, or as 04… for +614… numbers. */
+function searchNorm(s){return String(s||'').toLowerCase().replace(/['’`.]/g,'');}
+function searchWords(q){return searchNorm(q).split(/[\s,]+/).filter(Boolean);}
+function phoneKeys(p){const d=String(p||'').replace(/\D/g,'');return d.startsWith('61')?d+' 0'+d.slice(2):d;}
+function leadMatches(l,words){
+  if(!words.length)return true;
+  const hay=searchNorm(`${l.name||''} ${l.phone||''} ${phoneKeys(l.phone)} ${l.email||''} ${l.suburb||''} ${l.address||''} ${l.service||''} ${l.source||''}`);
+  return words.every(w=>hay.includes(w));
+}
 function dToStr(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function todayStr(){return dToStr(Date.now());}
 function fmtD(s){if(!s)return'';const p=s.split('-');return(+p[2])+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][p[1]-1];}
@@ -1741,7 +1751,7 @@ function renderBoard(){
   board.innerHTML='';
   const q=(document.getElementById('boardSearch')?.value||'').toLowerCase().trim();
   let al=activeLeads();
-  if(q)al=al.filter(l=>`${l.name} ${l.phone||''} ${l.email||''} ${l.suburb||''} ${l.address||''} ${l.service||''}`.toLowerCase().includes(q));
+  if(q){const words=searchWords(q);al=al.filter(l=>leadMatches(l,words));}
   if(!isDesk()){renderPhoneBoard(board,al,q);return;}
   board.className='board';
   document.getElementById('stageChips').innerHTML='';
@@ -1974,11 +1984,12 @@ function clientFilters(){
 /* Every client matching the search/filters, sorted — the table pages through this list. */
 function clientRows(f){
   const {q,fs,fsvc,fFrom,fTo}=f||clientFilters();
+  const words=searchWords(q);
   let rows=leads.filter(l=>{
     if(fs&&l.stage!==fs)return false;
     if(fsvc&&l.service!==fsvc)return false;
     if(fFrom||fTo){const d=dToStr(l.createdAt);if(fFrom&&d<fFrom)return false;if(fTo&&d>fTo)return false;}
-    if(q){const hay=`${l.name} ${l.phone} ${l.email} ${l.suburb} ${l.address||''} ${l.service} ${l.source}`.toLowerCase();if(!hay.includes(q))return false;}
+    if(q&&!leadMatches(l,words))return false;
     return true;
   });
   rows.sort((a,b)=>{let x=a[sortKey]??'',y=b[sortKey]??'';if(sortKey==='value'){x=+x||0;y=+y||0;}if(typeof x==='string'){x=x.toLowerCase();y=(''+y).toLowerCase();}return x<y?-sortDir:x>y?sortDir:0;});
