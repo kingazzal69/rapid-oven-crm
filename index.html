@@ -1902,13 +1902,20 @@ function cardNotesSave(id,val){
   lead.notes=v;
   syncLead(lead);
 }
+/* Ticking D1 moves a New lead to Contacted; ticking D2 moves a New/Contacted lead to Follow Up.
+   Only moves forward: unticking, or ticking on any later stage, leaves the stage alone. */
+const FLAG_STAGE={d1:{from:['new'],to:'contacted'},d2:{from:['new','contacted'],to:'followup'}};
 function toggleFlag(id,field,val){
   const lead=leads.find(x=>x.id===id);
   if(!lead)return;
   lead[field]=val;
   lead.trackedAt=Date.now();
+  const mv=val&&FLAG_STAGE[field];
+  const moved=mv&&mv.from.includes(lead.stage);
+  if(moved){lead.stage=mv.to;logAct(lead,'Moved to '+stageMap[mv.to].name+' (ticked '+field.toUpperCase()+')');}
   syncLead(lead);
   renderBoard();
+  if(moved)showToast('Moved to '+stageMap[mv.to].name);
 }
 function fuChip(l){
   if(!l.followUp||TERMINAL_STAGES.includes(l.stage))return'';
