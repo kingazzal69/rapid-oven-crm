@@ -178,7 +178,7 @@
   .card .val{margin-left:auto;font-weight:900;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums;padding-left:6px}
   .donechk{width:16px;height:16px;margin:2px 1px 0 0;flex-shrink:0;cursor:pointer}
   .card .sub{font-size:13px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
-  .card .meta{font-size:12.5px;color:var(--muted);margin-top:4px;overflow-wrap:anywhere}
+  .card .meta{font-size:12.5px;color:var(--muted);margin-top:5px;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:3px}
   .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
   .chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:999px;background:var(--panel-2);color:var(--muted);white-space:nowrap}
   .chip.svc{background:var(--accent-soft);color:var(--accent-dark)}
@@ -218,6 +218,12 @@
   .pcard{background:var(--panel);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);cursor:pointer;position:relative;overflow:hidden}
   .pcard::before{content:"";position:absolute;left:0;top:18px;width:4px;height:36px;border-radius:0 4px 4px 0;background:var(--sc)}
   .pcard .ptop{display:flex;align-items:flex-start;gap:12px}
+  .avchk{position:relative;cursor:pointer;margin:0;width:44px;height:44px}
+  .avchk input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+  .avchk input:checked+span{font-size:0}
+  .avchk input:checked+span::after{content:'✓';font-size:20px;color:#fff}
+  .avchk:has(input:checked){background:var(--good)}
+  .avchk input:focus-visible+span{outline:3px solid rgba(242,106,33,.45);outline-offset:4px;border-radius:50%}
   .pcard .who{min-width:0;flex:1}
   .pcard .nm{font-weight:800;font-size:17px;line-height:1.2;overflow-wrap:anywhere}
   .pcard .sub{color:var(--muted);font-size:13.5px;margin-top:3px}
@@ -336,12 +342,12 @@
   .crow .rowCheck{width:22px;height:22px}
   .crow .who{min-width:0;flex:1}
   .crow .t{font-weight:800;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .crow .s{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow .s{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .crow .s i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sc);margin-right:5px;vertical-align:1px}
   .crow .fu{margin-top:6px}
   .crow .fu .stagesel{font-size:16px;min-height:36px;max-width:190px!important;padding:3px 28px 3px 12px}
   .crow .r{margin-left:auto;text-align:right;font-weight:900;font-variant-numeric:tabular-nums;flex-shrink:0;font-size:15px}
-  .crow .r small{display:block;color:var(--faint);font-weight:700;font-size:12px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow .r small{display:block;color:var(--faint);font-weight:700;font-size:12px;max-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px}
   .pager .pinfo{color:var(--muted);font-size:13px;font-weight:700;margin-right:auto}
   .pager button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:800;color:var(--ink);min-width:40px;min-height:40px}
@@ -659,8 +665,10 @@
     .table-scroll{display:none}
     .clist{display:block}
     .selrow{gap:10px}
-    .clientcount{font-size:13px;margin-left:auto}
-    .drpop{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;border-radius:24px 24px 0 0;padding:22px max(16px,var(--safe-r)) calc(18px + var(--safe-b)) max(16px,var(--safe-l));z-index:102;max-height:88vh;overflow-y:auto;border:none;animation:sheetUp .26s cubic-bezier(.2,.8,.2,1)}
+    .clientcount{font-size:13px;flex-basis:100%;margin:0 4px}
+    .selall{flex-shrink:0}
+    #cSort{flex:1;min-width:0;padding:10px 30px 10px 14px;background-position:right 12px center}
+    .drpop{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;border-radius:24px 24px 0 0;padding:22px max(16px,var(--safe-r)) calc(18px + var(--safe-b)) max(16px,var(--safe-l));z-index:102;max-height:88vh;max-height:88dvh;overflow-y:auto;border:none;animation:sheetUp .26s cubic-bezier(.2,.8,.2,1)}
     .drpop::before{content:'';position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--line)}
     .drbg{background:rgba(42,22,8,.36);z-index:101}
     .drp{min-height:50px;font-size:16px}
@@ -668,7 +676,7 @@
     body.selbar-on #page-clients .wrap{padding-bottom:96px}
     /* modals -> bottom sheets */
     .overlay{align-items:flex-end;padding:0}
-    .modal,#accountOverlay .modal,#bulkSmsOverlay .modal{width:100%;max-width:100%;max-height:92vh;border-radius:24px 24px 0 0;animation:sheetUp .26s cubic-bezier(.2,.8,.2,1)}
+    .modal,#accountOverlay .modal,#bulkSmsOverlay .modal{width:100%;max-width:100%;max-height:92vh;max-height:92dvh;border-radius:24px 24px 0 0;animation:sheetUp .26s cubic-bezier(.2,.8,.2,1)}
     .modal-head{padding:22px 16px 12px;border-radius:24px 24px 0 0}
     .modal-head::before{content:'';position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--line)}
     .modal-body{padding:16px}
@@ -691,7 +699,7 @@
     .jcstrip::-webkit-scrollbar{display:none}
     .jcarrow{width:44px;height:44px}
     /* map */
-    #map{height:calc(100vh - 250px - var(--safe-b));min-height:340px}
+    #map{height:calc(100vh - 250px - var(--safe-b));height:calc(100dvh - 250px - var(--safe-b));min-height:340px}
     .maplegend{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 12px;padding:2px 16px 6px}
     .maplegend::-webkit-scrollbar{display:none}
     .maplegend>*{flex:0 0 auto}
@@ -707,6 +715,9 @@
   }
   @media(min-width:900px){
     .jcstrip{flex-wrap:wrap;overflow:visible}
+  }
+  @media(min-width:640px) and (max-width:899px){
+    #page-pipeline .wrap,#page-today .wrap{max-width:720px;margin:0 auto}
   }
 </style>
 </head>
@@ -862,6 +873,13 @@
     </div>
     <div class="selrow">
       <button class="selall" id="selectAllMatching" onclick="selectAllMatching()"><span class="cbv"></span><span id="selectAllMatchingLabel">Select all</span></button>
+      <select class="filter m-only" id="cSort" onchange="setClientSort(this.value)" aria-label="Sort clients">
+        <option value="createdAt:-1">Newest first</option><option value="createdAt:1">Oldest first</option>
+        <option value="name:1">Name A–Z</option><option value="value:-1">Value high–low</option>
+        <option value="suburb:1">Suburb A–Z</option><option value="stage:1">Stage</option>
+        <option value="followUp:1">Follow-up date</option><option value="service:1">Service</option><option value="source:1">Source</option>
+        <option value="" hidden>Custom sort</option>
+      </select>
       <div class="clientcount" id="clientCount"></div>
       <span id="archiveNote" class="hide archnote"></span>
     </div>
@@ -1784,10 +1802,11 @@ function cardEl(l){
   d.className='card';d.style.setProperty('--sc',stageMap[l.stage].color);
   const nextStage=nextStageOf(l);
   const tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
+  const mapA=txt=>`<a class="tel" draggable="false" href="${mapsLink(l)}" target="_blank" rel="noopener" title="Open in Google Maps" onclick="event.stopPropagation()">${esc(txt)}</a>`;
   d.innerHTML=`
     <div class="dtop"><input type="checkbox" class="donechk" onclick="event.stopPropagation()" title="Mark done"><span class="nm">${esc(l.name)}</span>${l.value?`<span class="val">${money(l.value)}</span>`:''}</div>
-    <div class="sub">${esc(l.service)}${l.phone?' · '+telLink(l.phone,true):''}</div>
-    ${(l.address||l.suburb)?`<div class="meta">📍 ${placeLink(l,true)}</div>`:''}
+    <div class="sub">${esc(l.service)}${l.suburb?' · '+(l.address?esc(l.suburb):mapA(l.suburb)):''}</div>
+    ${(l.phone||l.address)?`<div class="meta">${l.phone?`<span>📞 ${telLink(l.phone,true)}</span>`:''}${l.address?`<span>📍 ${mapA(l.address)}</span>`:''}</div>`:''}
     <div class="chips">
       <span class="chip src">${esc(l.source)}</span>
       ${fuChip(l)}
@@ -1815,7 +1834,7 @@ function pcardEl(l,showStage){
   const sub=[esc(l.service),esc(l.suburb||''),ago(l.createdAt)].filter(Boolean).join(' · ');
   d.innerHTML=`
     <div class="ptop">
-      <div class="av">${esc(avInitials(l.name))}</div>
+      <label class="av avchk" title="Mark done" onclick="event.stopPropagation()"><input type="checkbox" class="donechk" aria-label="Mark done"><span>${esc(avInitials(l.name))}</span></label>
       <div class="who"><div class="nm">${esc(l.name)}</div><div class="sub">${sub}</div></div>
       ${l.value?`<div class="val">${money(l.value)}</div>`:''}
     </div>
@@ -1905,10 +1924,11 @@ function selectAllMatching(){
   persistBulkSmsSelection();
   renderTable();
 }
+let lastClientRows=null;
 function renderSelectAllMatching(rows){
   const btn=document.getElementById('selectAllMatching');
   if(!btn)return;
-  rows=rows||clientRows();
+  rows=rows||lastClientRows||clientRows();
   const allOn=rows.length>0&&rows.every(l=>selectedClientIds.has(String(l.id)));
   btn.classList.toggle('on',allOn);
   btn.disabled=!rows.length||archivedLoading;
@@ -1939,6 +1959,8 @@ let sortKey='createdAt',sortDir=-1;
 let clientPage=1;const CLIENTS_PER_PAGE=100;
 function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}clientPage=1;renderTable();}
 function filterChanged(){clientPage=1;renderTable();}
+/* Phone has no column headers to tap, so a Sort menu sets the same sortKey/sortDir. */
+function setClientSort(v){if(!v)return;const [k,d]=v.split(':');sortKey=k;sortDir=+d;clientPage=1;renderTable();}
 function goToPage(p){clientPage=p;renderTable();document.querySelector('#page-clients .tablewrap').scrollIntoView({behavior:'smooth',block:'start'});}
 function clientFilters(){
   return{
@@ -1966,6 +1988,7 @@ function renderTable(){
   const f=clientFilters();
   const {q,fs,fsvc,fFrom,fTo}=f;
   const rows=clientRows(f);
+  lastClientRows=rows;
   const total=rows.length;
   const pages=Math.max(1,Math.ceil(total/CLIENTS_PER_PAGE));
   if(clientPage>pages)clientPage=pages;
@@ -2019,6 +2042,8 @@ function renderTable(){
   renderSelectAllMatching(rows);
   renderDateRangeLabel();
   renderSelBar();
+  const cs=document.getElementById('cSort'),sv=sortKey+':'+sortDir;
+  cs.value=[...cs.options].some(o=>o.value===sv)?sv:'';
 }
 
 /* ---------- Clients date range ----------
