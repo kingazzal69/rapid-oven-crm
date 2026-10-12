@@ -1673,7 +1673,17 @@ function fmtDT(ts){
   return day+', '+hh+':'+mm+ap;
 }
 function esc(s){return String(s||'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));}
-function telLink(p,stop){return p?`<a class=\"tel\" draggable=\"false\" href=\"tel:${p.replace(/[^\\d+]/g,'')}\"${stop?' onclick=\"event.stopPropagation()\"':''}>${esc(p)}</a>`:'';}
+/* Dialable number for tel:/sms: links: the first number in the field (some leads hold two), digits and + only,
+   with 61… → +61…, +610… → +61… and a dropped leading 0 (412…) put back. */
+function dialNum(p){
+  const m=String(p||'').match(/\+?\d[\d\s().-]{6,}\d/);
+  let n=m?m[0].replace(/[^\d+]/g,''):'';
+  if(/^\+610/.test(n))n='+61'+n.slice(4);
+  else if(/^61[2-478]\d{8}$/.test(n))n='+'+n;
+  else if(/^[2-478]\d{8}$/.test(n))n='0'+n;
+  return n;
+}
+function telLink(p,stop){return p?`<a class=\"tel\" draggable=\"false\" href=\"tel:${dialNum(p)}\"${stop?' onclick=\"event.stopPropagation()\"':''}>${esc(p)}</a>`:'';}
 function mapsLink(l){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([l.address,l.suburb,'NSW'].filter(Boolean).join(', '));}
 function placeLink(l,stop){
   if(!l.address&&!l.suburb)return'';
@@ -1835,7 +1845,7 @@ function cardEl(l){
   const d=document.createElement('div');
   d.className='card';d.style.setProperty('--sc',stageMap[l.stage].color);
   const nextStage=nextStageOf(l);
-  const tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
+  const tel=dialNum(l.phone);
   const mapA=txt=>`<a class="tel" draggable="false" href="${mapsLink(l)}" target="_blank" rel="noopener" title="Open in Google Maps" onclick="event.stopPropagation()">${esc(txt)}</a>`;
   d.innerHTML=`
     <div class="dtop"><input type="checkbox" class="donechk" onclick="event.stopPropagation()" title="Mark done"><span class="nm">${esc(l.name)}</span>${l.value?`<span class="val">${money(l.value)}</span>`:''}</div>
@@ -1864,7 +1874,7 @@ function pcardEl(l,showStage){
   const st=stageMap[l.stage];
   d.className='pcard';d.style.setProperty('--sc',st.color);
   const nextStage=nextStageOf(l);
-  const tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
+  const tel=dialNum(l.phone);
   const sub=[esc(l.service),esc(l.suburb||''),ago(l.createdAt)].filter(Boolean).join(' · ');
   d.innerHTML=`
     <div class="ptop">
@@ -2264,7 +2274,7 @@ function openModal(id){
 function renderLeadQuick(l){
   const el=document.getElementById('leadQuick');
   if(!l||!(l.phone||l.address||l.suburb)){el.classList.add('hide');el.innerHTML='';return;}
-  el.innerHTML=(l.phone?`<a class="act" href="tel:${l.phone.replace(/[^\d+]/g,'')}">${IC.call}Call</a>`:'')
+  el.innerHTML=(l.phone?`<a class="act" href="tel:${dialNum(l.phone)}">${IC.call}Call</a>`:'')
     +((l.address||l.suburb)?`<a class="act" href="${mapsLink(l)}" target="_blank" rel="noopener">${IC.map}Map</a>`:'');
   el.classList.remove('hide');
 }
@@ -2847,7 +2857,7 @@ function todayLeadRow(l,kind){
     ?(l.followUp<t?`<span class="over">Overdue · ${fmtD(l.followUp)}</span>`:'<span class="today">Due today</span>')
     :ago(l.createdAt);
   const sub=[when,esc(kind==='due'?st.name:l.service),esc(l.suburb||'')].filter(Boolean).join(' · ');
-  const tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
+  const tel=dialNum(l.phone);
   return `<div class="trow" onclick="openModal('${l.id}')">
     <div class="av">${esc(avInitials(l.name))}</div>
     <div class="who"><div class="t">${esc(l.name)}${l.value?`<em>${money(l.value)}</em>`:''}</div><div class="s">${sub}</div></div>
@@ -2907,8 +2917,7 @@ function followupLeads(){
 /* The button is a real sms: link so iPhone opens Messages with the number + text; the stage/D2 update
    runs on tap and the list redraws a moment later (redrawing first can cancel the link). */
 function followupSmsHref(l){
-  const m=(l.phone||'').match(/\+?\d[\d\s()-]{6,}\d/);
-  const num=m?m[0].replace(/[^\d+]/g,''):'';
+  const num=dialNum(l.phone);
   return num?'sms:'+num+'?&body='+encodeURIComponent(tplTextForLead(l,pickTplForStage('followup'))):'';
 }
 function sendFollowup(id){
@@ -2929,7 +2938,7 @@ function renderTodayFollowup(){
     ?`${list.length} lead${list.length===1?'':'s'} with D1 ticked in the last 3 days and no D2 yet`
     :'Leads show here for 3 days after D1 is ticked, until D2 is ticked.';
   el.innerHTML=list.map(l=>{
-    const st=stageMap[l.stage],tel=l.phone?l.phone.replace(/[^\d+]/g,''):'',sms=followupSmsHref(l);
+    const st=stageMap[l.stage],tel=dialNum(l.phone),sms=followupSmsHref(l);
     const sub=['D1 '+fmtDT(d1TickedAt(l)),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
     return `<div class="trow fu" onclick="openModal('${l.id}')">
       <div class="av">${esc(avInitials(l.name))}</div>
@@ -2956,7 +2965,7 @@ function sendReview(i){
   if(l){l.reviewSentAt=now;logAct(l,'Texted review request (Today › Reviews)');syncLead(l);}
   else{const m=revSentLocal();m[todayStr()+'|'+(j.leadId||j.customer)]=now;try{localStorage.setItem(REVIEW_SENT_KEY,JSON.stringify(m));}catch(_){/* still opens Messages */}}
   renderTodayReviews();
-  location.href='sms:'+j.phone.replace(/\s+/g,'')+'?&body='+encodeURIComponent(text);
+  location.href='sms:'+dialNum(j.phone)+'?&body='+encodeURIComponent(text);
 }
 function renderTodayReviews(){
   const el=document.getElementById('todayRevList'),note=document.getElementById('revNote'),badge=document.getElementById('todayRevN');
@@ -3132,7 +3141,7 @@ function tplCopy(){
   else{const ta=document.getElementById('tplText');ta.select();document.execCommand('copy');done();}
 }
 function tplSms(){
-  const phone=document.getElementById('f-phone').value.replace(/\s+/g,'');
+  const phone=dialNum(document.getElementById('f-phone').value);
   location.href='sms:'+phone+'?&body='+encodeURIComponent(document.getElementById('tplText').value);
   tplLogUse('Texted');
 }
@@ -3523,7 +3532,7 @@ function quickSms(id){
   if(!l||!l.phone)return;
   const i=pickTplForStage(l.stage);
   const text=tplTextForLead(l,i);
-  location.href='sms:'+l.phone.replace(/\s+/g,'')+'?&body='+encodeURIComponent(text);
+  location.href='sms:'+dialNum(l.phone)+'?&body='+encodeURIComponent(text);
   logAct(l,'Texted "'+(tpls[i]?tpls[i].name:'message')+'" template (quick)');
   syncLead(l);
 }
