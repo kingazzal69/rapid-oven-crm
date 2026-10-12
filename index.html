@@ -284,6 +284,8 @@
   .tdtabs .cnt:empty{display:none}
   .revnote{margin:0 4px 10px;padding:12px 14px;border-radius:var(--radius-sm);background:var(--accent-soft);color:var(--accent-dark);font-weight:700;font-size:14px}
   .trow.rev{cursor:default}
+  .revstaff{display:flex;align-items:center;gap:10px;padding:12px 14px 8px;background:var(--panel-3);border-bottom:1px solid var(--line-2);font-size:15px}
+  .revstaff span{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted)}
   .trow.rev .who .t{white-space:normal;overflow:visible}
   .revbtn{flex-shrink:0;min-height:44px;padding:0 14px;border:none;border-radius:999px;background:var(--grad);color:var(--accent-ink);font:inherit;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}
   .revbtn.sent{background:var(--panel-2);color:var(--good)}
@@ -2903,7 +2905,9 @@ function renderTodayReviews(){
     return;
   }
   const row=jcRows.find(r=>r.date===todayStr());
-  todayRevJobs=((row&&row.jobs)||[]).slice().sort((a,b)=>{const x=jcMins(a.time),y=jcMins(b.time);return x===y?0:x<y?-1:1;});
+  // Grouped by staff member (unassigned last), each person's jobs in time order.
+  const staffKey=j=>{const w=jcWho(j);return w==='Unassigned'?'\uffff':w.toLowerCase();};
+  todayRevJobs=((row&&row.jobs)||[]).slice().sort((a,b)=>{const sa=staffKey(a),sb=staffKey(b);if(sa!==sb)return sa<sb?-1:1;const x=jcMins(a.time),y=jcMins(b.time);return x===y?0:x<y?-1:1;});
   const sent=todayRevJobs.filter(j=>reviewSentAt(j)).length;
   const toSend=todayRevJobs.filter(j=>j.phone&&!reviewSentAt(j)).length;
   const anyPhone=todayRevJobs.some(j=>j.phone);
@@ -2913,14 +2917,21 @@ function renderTodayReviews(){
     :(after7?`It’s after 7pm — ${toSend} review${toSend===1?'':'s'} left to send`:`Send these from 7pm tonight`)+` · ${sent}/${todayRevJobs.length} sent`
     +(anyPhone?'':' · phone numbers arrive with the next hourly sync');
   if(!todayRevJobs.length){el.innerHTML='<div class="tempty">No jobs booked today.</div>';return;}
+  let lastWho=null;
   el.innerHTML=todayRevJobs.map((j,i)=>{
     const who=jcWho(j),q=j.status==='Quote',at=reviewSentAt(j);
+    let head='';
+    if(who!==lastWho){
+      lastWho=who;
+      const mine=todayRevJobs.filter(x=>jcWho(x)===who),done=mine.filter(x=>reviewSentAt(x)).length;
+      head=`<div class="revstaff"><div class="av sm staffav">${who==='Unassigned'?'?':esc(initials(who))}</div><b>${esc(who)}</b><span>${done}/${mine.length} sent</span></div>`;
+    }
     const btn=!j.phone?'<span class="revnone">No number yet</span>'
       :at?`<button class="revbtn sent" onclick="sendReview(${i})" title="Send again">✓ Sent ${esc(new Date(at).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}))}</button>`
       :`<button class="revbtn" onclick="sendReview(${i})">⭐ Send</button>`;
-    return `<div class="trow job rev${q?' q':''}">
+    return head+`<div class="trow job rev${q?' q':''}">
       <div class="tt">${esc(fmtTime12(j.time))||'—'}<small>${q?'Quote':'Work order'}</small></div>
-      <div class="who"><div class="t">${esc(j.customer)}</div><div class="s">${esc(who.split(/\s+/)[0])}${j.description?' · '+esc(j.description.trim()):''}</div></div>
+      <div class="who"><div class="t">${esc(j.customer)}</div><div class="s">${esc((j.description||'').trim())}</div></div>
       ${btn}
     </div>`;
   }).join('');
