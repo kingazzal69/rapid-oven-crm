@@ -276,6 +276,18 @@
   .trow .r{text-align:center;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;width:64px}
   .trow .r small{font-size:11.5px;color:var(--muted);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px}
   .tempty{padding:22px 18px;color:var(--muted);font-weight:600;text-align:center}
+  /* Today tabs (Overview / Reviews) */
+  .tdtabs{display:flex;gap:4px;background:var(--panel-2);border-radius:999px;padding:4px;margin:6px 0 14px}
+  .tdtabs button{flex:1;min-height:42px;border:none;background:none;border-radius:999px;font:inherit;font-weight:800;font-size:15px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+  .tdtabs button.on{background:var(--panel);color:var(--ink);box-shadow:var(--shadow-sm)}
+  .tdtabs .cnt{background:var(--accent);color:var(--accent-ink);border-radius:999px;font-size:11px;padding:1px 7px;line-height:1.5}
+  .tdtabs .cnt:empty{display:none}
+  .revnote{margin:0 4px 10px;padding:12px 14px;border-radius:var(--radius-sm);background:var(--accent-soft);color:var(--accent-dark);font-weight:700;font-size:14px}
+  .trow.rev{cursor:default}
+  .trow.rev .who .t{white-space:normal;overflow:visible}
+  .revbtn{flex-shrink:0;min-height:44px;padding:0 14px;border:none;border-radius:999px;background:var(--grad);color:var(--accent-ink);font:inherit;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}
+  .revbtn.sent{background:var(--panel-2);color:var(--good)}
+  .revnone{flex-shrink:0;font-size:12px;font-weight:700;color:var(--faint);text-align:right;max-width:90px}
   @media(min-width:900px){
     .tgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"due jobs" "new jobs";grid-template-rows:auto 1fr;column-gap:24px;align-items:start}
     .tgrid .tdue{grid-area:due}.tgrid .tnew{grid-area:new}.tgrid .tjobs{grid-area:jobs}
@@ -835,7 +847,12 @@
 <section id="page-today" class="page">
   <div class="wrap">
     <div class="tdhead"><div class="tddate" id="todayDate"></div><div class="tdsum" id="todaySummary"></div></div>
-    <div class="tgrid">
+    <div class="tdtabs" role="tablist">
+      <button id="tdtab-overview" class="on" role="tab" onclick="setTodayTab('overview')">Overview</button>
+      <button id="tdtab-reviews" role="tab" onclick="setTodayTab('reviews')">⭐ Reviews <span class="cnt" id="todayRevN"></span></button>
+    </div>
+    <div id="todayReviews" class="hide"><div class="revnote" id="revNote"></div><div class="group" id="todayRevList"></div></div>
+    <div class="tgrid" id="todayOverview">
       <div class="tdue"><div class="gh">Follow-ups due <span class="cnt" id="todayDueN"></span></div><div class="group" id="todayDue"></div></div>
       <div class="tnew"><div class="gh">New leads <span class="cnt" id="todayNewN"></span></div><div class="group" id="todayNew"></div></div>
       <div class="tjobs"><div class="gh">Today’s jobs <span class="cnt" id="todayJobsN"></span><button class="ghlink" onclick="showPage('jobcount')">Job Count ›</button></div><div class="group" id="todayJobs"></div></div>
@@ -2834,6 +2851,7 @@ function renderToday(){
   document.getElementById('todayDue').innerHTML=due.map(l=>todayLeadRow(l,'due')).join('')||'<div class="tempty">No follow-ups due. Nice one!</div>';
   document.getElementById('todayNew').innerHTML=fresh.map(l=>todayLeadRow(l,'new')).join('')||'<div class="tempty">No new leads right now.</div>';
   renderTodayJobs();
+  renderTodayReviews();
   if(!jcLoadedAt||jcStale||Date.now()-jcLoadedAt>5*60000)loadTodayJobs();
 }
 async function loadTodayJobs(){
@@ -2842,7 +2860,70 @@ async function loadTodayJobs(){
   try{jcRows=await jcFetchRows();jcLoadedAt=Date.now();jcStale=false;todayJcErr=false;}
   catch(e){console.warn('Job Count fetch failed:',e);todayJcErr=true;}
   finally{todayJcLoading=false;}
-  if(document.getElementById('page-today').classList.contains('active'))renderTodayJobs();
+  if(document.getElementById('page-today').classList.contains('active')){renderTodayJobs();renderTodayReviews();}
+}
+/* ---------- Today › Reviews ----------
+   Today's Job Count jobs with a one-tap review text. Phone + leadId come from the Job Count Tracker
+   (n8n) on each jobs[] entry. Sending opens the phone's Messages pre-filled (nothing is sent by the CRM)
+   and stamps reviewSentAt on the CRM lead so the job shows as sent on every device. */
+let todayTab='overview',todayRevJobs=[];
+function setTodayTab(t){
+  todayTab=t;
+  ['overview','reviews'].forEach(k=>document.getElementById('tdtab-'+k).classList.toggle('on',k===t));
+  document.getElementById('todayOverview').classList.toggle('hide',t!=='overview');
+  document.getElementById('todayReviews').classList.toggle('hide',t!=='reviews');
+  if(t==='reviews')renderTodayReviews();
+}
+function reviewTplText(){const t=tpls.find(x=>/review/i.test(x.name||''))||tpls[4]||tpls[0];return t?t.text:'';}
+function jobLead(j){return j.leadId?leads.find(l=>l.id===j.leadId):null;}
+const REVIEW_SENT_KEY='rocReviewsSent';
+function revSentLocal(){try{return JSON.parse(localStorage.getItem(REVIEW_SENT_KEY)||'{}')||{};}catch(_){return{};}}
+function reviewSentAt(j){
+  const l=jobLead(j);
+  if(l&&l.reviewSentAt&&dToStr(l.reviewSentAt)===todayStr())return l.reviewSentAt;
+  return revSentLocal()[todayStr()+'|'+(j.leadId||j.customer)]||0;
+}
+function sendReview(i){
+  const j=todayRevJobs[i];
+  if(!j||!j.phone)return;
+  const l=jobLead(j);
+  const text=personaliseSmsText(l||{name:j.customer,service:j.description||'oven clean'},reviewTplText());
+  const now=Date.now();
+  if(l){l.reviewSentAt=now;logAct(l,'Texted review request (Today › Reviews)');syncLead(l);}
+  else{const m=revSentLocal();m[todayStr()+'|'+(j.leadId||j.customer)]=now;try{localStorage.setItem(REVIEW_SENT_KEY,JSON.stringify(m));}catch(_){/* still opens Messages */}}
+  renderTodayReviews();
+  location.href='sms:'+j.phone.replace(/\s+/g,'')+'?&body='+encodeURIComponent(text);
+}
+function renderTodayReviews(){
+  const el=document.getElementById('todayRevList'),note=document.getElementById('revNote'),badge=document.getElementById('todayRevN');
+  if(!el)return;
+  if(!jcLoadedAt){
+    badge.textContent='';note.textContent='Tonight’s review texts go out from 7pm.';
+    el.innerHTML=`<div class="tempty">${todayJcErr?'Couldn’t load today’s jobs — try again shortly.':'Loading today’s jobs…'}</div>`;
+    return;
+  }
+  const row=jcRows.find(r=>r.date===todayStr());
+  todayRevJobs=((row&&row.jobs)||[]).slice().sort((a,b)=>{const x=jcMins(a.time),y=jcMins(b.time);return x===y?0:x<y?-1:1;});
+  const sent=todayRevJobs.filter(j=>reviewSentAt(j)).length;
+  const toSend=todayRevJobs.filter(j=>j.phone&&!reviewSentAt(j)).length;
+  const anyPhone=todayRevJobs.some(j=>j.phone);
+  badge.textContent=toSend||'';
+  const after7=new Date().getHours()>=19;
+  note.textContent=!todayRevJobs.length?'No jobs booked today, so no reviews to send.'
+    :(after7?`It’s after 7pm — ${toSend} review${toSend===1?'':'s'} left to send`:`Send these from 7pm tonight`)+` · ${sent}/${todayRevJobs.length} sent`
+    +(anyPhone?'':' · phone numbers arrive with the next hourly sync');
+  if(!todayRevJobs.length){el.innerHTML='<div class="tempty">No jobs booked today.</div>';return;}
+  el.innerHTML=todayRevJobs.map((j,i)=>{
+    const who=jcWho(j),q=j.status==='Quote',at=reviewSentAt(j);
+    const btn=!j.phone?'<span class="revnone">No number yet</span>'
+      :at?`<button class="revbtn sent" onclick="sendReview(${i})" title="Send again">✓ Sent ${esc(new Date(at).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}))}</button>`
+      :`<button class="revbtn" onclick="sendReview(${i})">⭐ Send</button>`;
+    return `<div class="trow job rev${q?' q':''}">
+      <div class="tt">${esc(fmtTime12(j.time))||'—'}<small>${q?'Quote':'Work order'}</small></div>
+      <div class="who"><div class="t">${esc(j.customer)}</div><div class="s">${esc(who.split(/\s+/)[0])}${j.description?' · '+esc(j.description.trim()):''}</div></div>
+      ${btn}
+    </div>`;
+  }).join('');
 }
 function renderTodayJobs(){
   const el=document.getElementById('todayJobs'),n=document.getElementById('todayJobsN');
