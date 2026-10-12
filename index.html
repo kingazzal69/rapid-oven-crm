@@ -286,7 +286,8 @@
   .trow.rev{cursor:default}
   .revstaff{display:flex;align-items:center;gap:10px;padding:12px 14px 8px;background:var(--panel-3);border-bottom:1px solid var(--line-2);font-size:15px}
   .revstaff span{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted)}
-  .trow.rev .who .t{white-space:normal;overflow:visible}
+  .trow.rev .who .t,.trow.fu .who .t{white-space:normal;overflow:visible}
+  .tdtabs button{white-space:nowrap}
   .revbtn{flex-shrink:0;min-height:44px;padding:0 14px;border:none;border-radius:999px;background:var(--grad);color:var(--accent-ink);font:inherit;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}
   .revbtn.sent{background:var(--panel-2);color:var(--good)}
   .revnone{flex-shrink:0;font-size:12px;font-weight:700;color:var(--faint);text-align:right;max-width:90px}
@@ -851,8 +852,10 @@
     <div class="tdhead"><div class="tddate" id="todayDate"></div><div class="tdsum" id="todaySummary"></div></div>
     <div class="tdtabs" role="tablist">
       <button id="tdtab-overview" class="on" role="tab" onclick="setTodayTab('overview')">Overview</button>
+      <button id="tdtab-followup" role="tab" onclick="setTodayTab('followup')">Follow Up <span class="cnt" id="todayFuN"></span></button>
       <button id="tdtab-reviews" role="tab" onclick="setTodayTab('reviews')">⭐ Reviews <span class="cnt" id="todayRevN"></span></button>
     </div>
+    <div id="todayFollowup" class="hide"><div class="revnote" id="fuNote"></div><div class="group" id="todayFuList"></div></div>
     <div id="todayReviews" class="hide"><div class="revnote" id="revNote"></div><div class="group" id="todayRevList"></div></div>
     <div class="tgrid" id="todayOverview">
       <div class="tdue"><div class="gh">Follow-ups due <span class="cnt" id="todayDueN"></span></div><div class="group" id="todayDue"></div></div>
@@ -2854,6 +2857,7 @@ function renderToday(){
   document.getElementById('todayNew').innerHTML=fresh.map(l=>todayLeadRow(l,'new')).join('')||'<div class="tempty">No new leads right now.</div>';
   renderTodayJobs();
   renderTodayReviews();
+  renderTodayFollowup();
   if(!jcLoadedAt||jcStale||Date.now()-jcLoadedAt>5*60000)loadTodayJobs();
 }
 async function loadTodayJobs(){
@@ -2871,10 +2875,51 @@ async function loadTodayJobs(){
 let todayTab='overview',todayRevJobs=[];
 function setTodayTab(t){
   todayTab=t;
-  ['overview','reviews'].forEach(k=>document.getElementById('tdtab-'+k).classList.toggle('on',k===t));
+  ['overview','followup','reviews'].forEach(k=>document.getElementById('tdtab-'+k).classList.toggle('on',k===t));
   document.getElementById('todayOverview').classList.toggle('hide',t!=='overview');
+  document.getElementById('todayFollowup').classList.toggle('hide',t!=='followup');
+  if(t==='followup')renderTodayFollowup();
   document.getElementById('todayReviews').classList.toggle('hide',t!=='reviews');
   if(t==='reviews')renderTodayReviews();
+}
+/* ---------- Today › Follow Up ----------
+   Active leads whose D1 box was ticked in the last 48h and D2 isn't ticked yet (trackedAt is stamped by
+   toggleFlag on any D tick). "Follow up" moves the lead to the Follow Up stage, ticks D2 and opens the
+   phone's Messages pre-filled with the Follow-up template. */
+const FU_WINDOW_MS=48*3600000;
+function followupLeads(){
+  const now=Date.now();
+  return activeLeads().filter(l=>l.d1&&!l.d2&&l.trackedAt&&now-l.trackedAt<=FU_WINDOW_MS&&!TERMINAL_STAGES.includes(l.stage))
+    .sort((a,b)=>a.trackedAt-b.trackedAt);
+}
+function sendFollowup(id){
+  const l=leads.find(x=>x.id===id);
+  if(!l||!l.phone)return;
+  const text=tplTextForLead(l,pickTplForStage('followup'));
+  if(l.stage!=='followup'){logAct(l,'Moved to '+stageMap.followup.name);l.stage='followup';}
+  l.d2=true;l.trackedAt=Date.now();
+  logAct(l,'Texted follow-up, ticked D2 (Today › Follow Up)');
+  syncLead(l);
+  renderBoard();renderTodayFollowup();
+  location.href='sms:'+l.phone.replace(/\s+/g,'')+'?&body='+encodeURIComponent(text);
+}
+function renderTodayFollowup(){
+  const el=document.getElementById('todayFuList');
+  if(!el)return;
+  const list=followupLeads();
+  document.getElementById('todayFuN').textContent=list.length||'';
+  document.getElementById('fuNote').textContent=list.length
+    ?`${list.length} lead${list.length===1?'':'s'} with D1 ticked in the last 48h and no D2 yet`
+    :'Leads show here for 48h after D1 is ticked, until D2 is ticked.';
+  el.innerHTML=list.map(l=>{
+    const st=stageMap[l.stage],tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
+    const sub=['D1 '+ago(l.trackedAt),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
+    return `<div class="trow fu" onclick="openModal('${l.id}')">
+      <div class="av">${esc(avInitials(l.name))}</div>
+      <div class="who"><div class="t">${esc(l.name)}</div><div class="s">${sub}</div></div>
+      ${l.phone?`<div class="tacts" onclick="event.stopPropagation()"><a class="ib call" href="tel:${tel}" title="Call ${esc(l.phone)}" aria-label="Call">${IC.call}</a><button class="revbtn" onclick="sendFollowup('${l.id}')">Follow up</button></div>`:'<span class="revnone">No number</span>'}
+    </div>`;
+  }).join('')||'<div class="tempty">Nothing to follow up right now.</div>';
 }
 function reviewTplText(){const t=tpls.find(x=>/review/i.test(x.name||''))||tpls[4]||tpls[0];return t?t.text:'';}
 function jobLead(j){return j.leadId?leads.find(l=>l.id===j.leadId):null;}
