@@ -1818,7 +1818,8 @@ function toggleCol(id){
 /* D1/D2/D3: real checkboxes (toggleFlag on change), drawn as pills. */
 function tkHtml(l,k){
   const titles={d1:'Day 1 follow-up done',d2:'Day 2 follow-up done',d3:'Day 3 follow-up done'};
-  return `<label class="tk" title="${titles[k]}"><input type="checkbox" ${l[k]?'checked':''} onchange="toggleFlag('${l.id}','${k}',this.checked)"><span>${k.toUpperCase()}</span></label>`;
+  const at=l[k]&&l[k+'At']?' · ticked '+fmtDT(l[k+'At']):'';
+  return `<label class="tk" title="${titles[k]}${at}"><input type="checkbox" ${l[k]?'checked':''} onchange="toggleFlag('${l.id}','${k}',this.checked)"><span>${k.toUpperCase()}</span></label>`;
 }
 function stageSelHtml(l){
   return `<select class="stagesel" title="Move to another stage" aria-label="Stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select>`;
@@ -1910,6 +1911,8 @@ function toggleFlag(id,field,val){
   if(!lead)return;
   lead[field]=val;
   lead.trackedAt=Date.now();
+  // d1At/d2At/d3At: when that box was ticked (cleared on untick).
+  if(val)lead[field+'At']=lead.trackedAt;else delete lead[field+'At'];
   const mv=val&&FLAG_STAGE[field];
   const moved=mv&&mv.from.includes(lead.stage);
   if(moved){lead.stage=mv.to;logAct(lead,'Moved to '+stageMap[mv.to].name+' (ticked '+field.toUpperCase()+')');}
@@ -2890,20 +2893,22 @@ function setTodayTab(t){
   if(t==='reviews')renderTodayReviews();
 }
 /* ---------- Today › Follow Up ----------
-   Active leads that came in during the last 3 days, have D1 ticked and D2 not ticked yet. "Follow up" moves the lead to the Follow Up stage, ticks D2 and opens the
+   Active leads whose D1 box was ticked in the last 3 days (d1At; older ticks fall back to trackedAt)
+   and D2 not ticked yet. "Follow up" moves the lead to the Follow Up stage, ticks D2 and opens the
    phone's Messages pre-filled with the Follow-up template. */
 const FU_WINDOW_MS=3*24*3600000;
+function d1TickedAt(l){return l.d1At||l.trackedAt||0;}
 function followupLeads(){
   const now=Date.now();
-  return activeLeads().filter(l=>l.d1&&!l.d2&&l.createdAt&&now-l.createdAt<=FU_WINDOW_MS&&!TERMINAL_STAGES.includes(l.stage))
-    .sort((a,b)=>a.createdAt-b.createdAt);
+  return activeLeads().filter(l=>l.d1&&!l.d2&&d1TickedAt(l)&&now-d1TickedAt(l)<=FU_WINDOW_MS&&!TERMINAL_STAGES.includes(l.stage))
+    .sort((a,b)=>d1TickedAt(a)-d1TickedAt(b));
 }
 function sendFollowup(id){
   const l=leads.find(x=>x.id===id);
   if(!l||!l.phone)return;
   const text=tplTextForLead(l,pickTplForStage('followup'));
   if(l.stage!=='followup'){logAct(l,'Moved to '+stageMap.followup.name);l.stage='followup';}
-  l.d2=true;l.trackedAt=Date.now();
+  l.d2=true;l.trackedAt=l.d2At=Date.now();
   logAct(l,'Texted follow-up, ticked D2 (Today › Follow Up)');
   syncLead(l);
   renderBoard();renderTodayFollowup();
@@ -2915,11 +2920,11 @@ function renderTodayFollowup(){
   const list=followupLeads();
   document.getElementById('todayFuN').textContent=list.length||'';
   document.getElementById('fuNote').textContent=list.length
-    ?`${list.length} lead${list.length===1?'':'s'} from the last 3 days with D1 ticked and no D2 yet`
-    :'Leads from the last 3 days show here once D1 is ticked, until D2 is ticked.';
+    ?`${list.length} lead${list.length===1?'':'s'} with D1 ticked in the last 3 days and no D2 yet`
+    :'Leads show here for 3 days after D1 is ticked, until D2 is ticked.';
   el.innerHTML=list.map(l=>{
     const st=stageMap[l.stage],tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
-    const sub=['Added '+ago(l.createdAt),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
+    const sub=['D1 '+fmtDT(d1TickedAt(l)),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
     return `<div class="trow fu" onclick="openModal('${l.id}')">
       <div class="av">${esc(avInitials(l.name))}</div>
       <div class="who"><div class="t">${esc(l.name)}</div><div class="s">${sub}</div></div>
