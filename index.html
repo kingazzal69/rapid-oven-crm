@@ -289,6 +289,7 @@
   .trow.rev .who .t,.trow.fu .who .t{white-space:normal;overflow:visible}
   .tdtabs button{white-space:nowrap}
   .revbtn{flex-shrink:0;min-height:44px;padding:0 14px;border:none;border-radius:999px;background:var(--grad);color:var(--accent-ink);font:inherit;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}
+  .revbtn.fubtn{display:inline-flex;align-items:center;text-decoration:none}
   .revbtn.sent{background:var(--panel-2);color:var(--good)}
   .revnone{flex-shrink:0;font-size:12px;font-weight:700;color:var(--faint);text-align:right;max-width:90px}
   @media(min-width:900px){
@@ -2903,16 +2904,21 @@ function followupLeads(){
   return activeLeads().filter(l=>l.d1&&!l.d2&&d1TickedAt(l)&&now-d1TickedAt(l)<=FU_WINDOW_MS&&!TERMINAL_STAGES.includes(l.stage))
     .sort((a,b)=>d1TickedAt(a)-d1TickedAt(b));
 }
+/* The button is a real sms: link so iPhone opens Messages with the number + text; the stage/D2 update
+   runs on tap and the list redraws a moment later (redrawing first can cancel the link). */
+function followupSmsHref(l){
+  const m=(l.phone||'').match(/\+?\d[\d\s()-]{6,}\d/);
+  const num=m?m[0].replace(/[^\d+]/g,''):'';
+  return num?'sms:'+num+'?&body='+encodeURIComponent(tplTextForLead(l,pickTplForStage('followup'))):'';
+}
 function sendFollowup(id){
   const l=leads.find(x=>x.id===id);
-  if(!l||!l.phone)return;
-  const text=tplTextForLead(l,pickTplForStage('followup'));
+  if(!l)return;
   if(l.stage!=='followup'){logAct(l,'Moved to '+stageMap.followup.name);l.stage='followup';}
   l.d2=true;l.trackedAt=l.d2At=Date.now();
   logAct(l,'Texted follow-up, ticked D2 (Today › Follow Up)');
   syncLead(l);
-  renderBoard();renderTodayFollowup();
-  location.href='sms:'+l.phone.replace(/\s+/g,'')+'?&body='+encodeURIComponent(text);
+  setTimeout(()=>{renderBoard();renderTodayFollowup();},800);
 }
 function renderTodayFollowup(){
   const el=document.getElementById('todayFuList');
@@ -2923,12 +2929,12 @@ function renderTodayFollowup(){
     ?`${list.length} lead${list.length===1?'':'s'} with D1 ticked in the last 3 days and no D2 yet`
     :'Leads show here for 3 days after D1 is ticked, until D2 is ticked.';
   el.innerHTML=list.map(l=>{
-    const st=stageMap[l.stage],tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
+    const st=stageMap[l.stage],tel=l.phone?l.phone.replace(/[^\d+]/g,''):'',sms=followupSmsHref(l);
     const sub=['D1 '+fmtDT(d1TickedAt(l)),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
     return `<div class="trow fu" onclick="openModal('${l.id}')">
       <div class="av">${esc(avInitials(l.name))}</div>
       <div class="who"><div class="t">${esc(l.name)}</div><div class="s">${sub}</div></div>
-      ${l.phone?`<div class="tacts" onclick="event.stopPropagation()"><a class="ib call" href="tel:${tel}" title="Call ${esc(l.phone)}" aria-label="Call">${IC.call}</a><button class="revbtn" onclick="sendFollowup('${l.id}')">Follow up</button></div>`:'<span class="revnone">No number</span>'}
+      ${sms?`<div class="tacts" onclick="event.stopPropagation()"><a class="ib call" href="tel:${tel}" title="Call ${esc(l.phone)}" aria-label="Call">${IC.call}</a><a class="revbtn fubtn" href="${esc(sms)}" onclick="sendFollowup('${l.id}')">Follow up</a></div>`:'<span class="revnone">No number</span>'}
     </div>`;
   }).join('')||'<div class="tempty">Nothing to follow up right now.</div>';
 }
