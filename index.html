@@ -2890,14 +2890,13 @@ function setTodayTab(t){
   if(t==='reviews')renderTodayReviews();
 }
 /* ---------- Today › Follow Up ----------
-   Active leads whose D1 box was ticked in the last 48h and D2 isn't ticked yet (trackedAt is stamped by
-   toggleFlag on any D tick). "Follow up" moves the lead to the Follow Up stage, ticks D2 and opens the
+   Active leads that came in during the last 3 days, have D1 ticked and D2 not ticked yet. "Follow up" moves the lead to the Follow Up stage, ticks D2 and opens the
    phone's Messages pre-filled with the Follow-up template. */
-const FU_WINDOW_MS=48*3600000;
+const FU_WINDOW_MS=3*24*3600000;
 function followupLeads(){
   const now=Date.now();
-  return activeLeads().filter(l=>l.d1&&!l.d2&&l.trackedAt&&now-l.trackedAt<=FU_WINDOW_MS&&!TERMINAL_STAGES.includes(l.stage))
-    .sort((a,b)=>a.trackedAt-b.trackedAt);
+  return activeLeads().filter(l=>l.d1&&!l.d2&&l.createdAt&&now-l.createdAt<=FU_WINDOW_MS&&!TERMINAL_STAGES.includes(l.stage))
+    .sort((a,b)=>a.createdAt-b.createdAt);
 }
 function sendFollowup(id){
   const l=leads.find(x=>x.id===id);
@@ -2916,11 +2915,11 @@ function renderTodayFollowup(){
   const list=followupLeads();
   document.getElementById('todayFuN').textContent=list.length||'';
   document.getElementById('fuNote').textContent=list.length
-    ?`${list.length} lead${list.length===1?'':'s'} with D1 ticked in the last 48h and no D2 yet`
-    :'Leads show here for 48h after D1 is ticked, until D2 is ticked.';
+    ?`${list.length} lead${list.length===1?'':'s'} from the last 3 days with D1 ticked and no D2 yet`
+    :'Leads from the last 3 days show here once D1 is ticked, until D2 is ticked.';
   el.innerHTML=list.map(l=>{
     const st=stageMap[l.stage],tel=l.phone?l.phone.replace(/[^\d+]/g,''):'';
-    const sub=['D1 '+ago(l.trackedAt),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
+    const sub=['Added '+ago(l.createdAt),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
     return `<div class="trow fu" onclick="openModal('${l.id}')">
       <div class="av">${esc(avInitials(l.name))}</div>
       <div class="who"><div class="t">${esc(l.name)}</div><div class="s">${sub}</div></div>
