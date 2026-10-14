@@ -678,7 +678,7 @@
     .cfilters .drwrap{grid-column:1/-1}
     .drbtn{width:100%;justify-content:center}
     .cbulk{display:none}
-    .table-scroll{display:none}
+    #page-clients .table-scroll{display:none}
     .clist{display:block}
     .selrow{gap:10px}
     .clientcount{font-size:13px;flex-basis:100%;margin:0 4px}
@@ -710,10 +710,20 @@
     .calgrid{min-width:600px}
     /* job count */
     .jcwrap{display:flex;flex-direction:column}
-    .jcwrap>.toolbar{order:0}.jcwrap>#jcStats{order:1}.jcwrap>#jcStaffWrap{order:2}.jcwrap>.jcweek{order:3}.jcwrap>.jcdaily{order:4}
+    .jcwrap>.toolbar{order:0}.jcwrap>#jcStats{order:1}.jcwrap>.jcweek{order:2}.jcwrap>#jcStaffWrap{order:3}.jcwrap>.jcdaily{order:4}
+    .jcwrap:not(.wkopen)>.jcweek{display:none}
+    .jcwrap>.jcweek{margin-bottom:10px}
+    #jcStats .stat.jcbooked{cursor:pointer;display:flex;align-items:center;gap:10px}
+    #jcStats .stat.jcbooked>div:first-child{flex:1;min-width:0}
+    .jcwkhint{flex-shrink:0;font-size:13px;font-weight:800;background:rgba(255,255,255,.22);border-radius:999px;padding:7px 12px;white-space:nowrap}
+    .jcwkhint i{display:inline-block;font-style:normal;font-size:15px;line-height:1;transition:transform .2s}
+    .jcwrap.wkopen .jcwkhint i{transform:rotate(180deg)}
     .jcstrip{margin:0 -16px 10px;padding:2px 16px 8px;scroll-padding:0 16px;scrollbar-width:none}
     .jcstrip::-webkit-scrollbar{display:none}
     .jcarrow{width:44px;height:44px}
+    #page-jobcount th,#page-jobcount td{padding-left:7px;padding-right:7px}
+    #page-jobcount th:first-child,#page-jobcount td:first-child{padding-left:14px}
+    #jcWeekBody td{white-space:nowrap}
     /* map */
     #map{height:calc(100vh - 250px - var(--safe-b));height:calc(100dvh - 250px - var(--safe-b));min-height:340px}
     .maplegend{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 12px;padding:2px 16px 6px}
@@ -1025,10 +1035,10 @@
           <table>
             <thead><tr>
               <th>Week</th>
-              <th>Quotes</th>
-              <th>Work Orders</th>
+              <th><span class="d-only">Quotes</span><span class="m-only">Q</span></th>
+              <th><span class="d-only">Work Orders</span><span class="m-only">WO</span></th>
               <th>Total</th>
-              <th>Needed/Day to Hit Target</th>
+              <th><span class="d-only">Needed/Day to Hit Target</span><span class="m-only">Needed</span></th>
             </tr></thead>
             <tbody id="jcWeekBody"></tbody>
           </table>
@@ -1047,8 +1057,8 @@
           <table>
             <thead><tr>
               <th>Date</th>
-              <th>Quotes</th>
-              <th>Work Orders</th>
+              <th><span class="d-only">Quotes</span><span class="m-only">Q</span></th>
+              <th><span class="d-only">Work Orders</span><span class="m-only">WO</span></th>
               <th>Total</th>
             </tr></thead>
             <tbody id="jcBody"></tbody>
@@ -2747,6 +2757,8 @@ function renderJcSchedule(){
   }).join('');
   document.getElementById('jcCards').innerHTML=title+JC_LEGEND+`<div class="jccards">${cards}</div>`;
 }
+/* Phone: tapping the Booked tile shows/hides Weekly totals just under the tiles (desktop always shows them). */
+function jcToggleWeek(){document.querySelector('.jcwrap').classList.toggle('wkopen');}
 async function renderJobCount(){
   const statsEl=document.getElementById('jcStats');
   const body=document.getElementById('jcBody');
@@ -2785,7 +2797,7 @@ async function renderJobCount(){
   const gap=target-total;
   const avgNeeded=gap>0?(gap/days).toFixed(1):0;
   statsEl.innerHTML=`
-    <div class="stat accent"><div class="k">Booked (3-week window)</div><div class="v">${total}</div></div>
+    <div class="stat accent jcbooked" onclick="jcToggleWeek()"><div><div class="k">Booked (3-week window)</div><div class="v">${total}</div></div><span class="jcwkhint m-only">Weekly <i>▾</i></span></div>
     <div class="stat"><div class="k">Quotes</div><div class="v">${totalQ}</div></div>
     <div class="stat"><div class="k">Work Orders</div><div class="v">${totalWO}</div></div>
     <div class="stat"><div class="k">Target (3wk, ${jobTarget}/wk)</div><div class="v">${target}</div></div>
