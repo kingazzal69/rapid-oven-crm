@@ -188,6 +188,7 @@
   .chip.due.today{background:#fff0cf;color:#935000}
   .chip.due.over{background:#ffe3df;color:#b52a1f}
   .chip.job{background:#e2f5e8;color:#237040}
+  .chip.src.srcc{background:var(--srcc);color:#fff}
   .chip.stg{background:var(--panel);box-shadow:inset 0 0 0 1.5px var(--line);color:var(--ink)}
   .chip.stg i{width:7px;height:7px;border-radius:50%;background:var(--sc)}
   textarea.cardnotes{display:block;width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12.5px;color:var(--muted);margin-top:7px;padding:5px 7px;border-radius:10px;resize:vertical;line-height:1.4}
@@ -1861,7 +1862,7 @@ function cardEl(l){
     <div class="sub">${esc(l.service)}${l.suburb?' · '+(l.address?esc(l.suburb):mapA(l.suburb)):''}</div>
     ${(l.phone||l.address)?`<div class="meta">${l.phone?`<span>📞 ${telLink(l.phone,true)}</span>`:''}${l.address?`<span>📍 ${mapA(l.address)}</span>`:''}</div>`:''}
     <div class="chips">
-      <span class="chip src">${esc(l.source)}</span>
+      ${srcChip(l)}
       ${fuChip(l)}
       ${jobChip(l)}
     </div>
@@ -1891,7 +1892,7 @@ function pcardEl(l,showStage){
       <div class="who"><div class="nm">${esc(l.name)}</div><div class="sub">${sub}</div></div>
       ${l.value?`<div class="val">${money(l.value)}</div>`:''}
     </div>
-    <div class="chips">${showStage?`<span class="chip stg" style="--sc:${st.color}"><i></i>${esc(st.name)}</span>`:''}<span class="chip src">${esc(l.source)}</span>${fuChip(l)}${jobChip(l)}</div>
+    <div class="chips">${showStage?`<span class="chip stg" style="--sc:${st.color}"><i></i>${esc(st.name)}</span>`:''}${srcChip(l)}${fuChip(l)}${jobChip(l)}</div>
     ${(l.phone||l.address||l.suburb)?`<div class="pinfo">${l.phone?`<span>${IC.call}${telLink(l.phone,true)}</span>`:''}${(l.address||l.suburb)?`<span>${IC.map}${placeLink(l,true)}</span>`:''}</div>`:''}
     <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
     <div class="actions${l.phone?'':' nophone'}" onclick="event.stopPropagation()">
@@ -1939,6 +1940,38 @@ function toggleFlag(id,field,val){
   syncLead(lead);
   renderBoard();
   if(moved)showToast('Moved to '+stageMap[mv.to].name);
+}
+/* Lead source for display. ServiceM8-synced leads all have source "ServiceM8"; the real channel is in the
+   job description, e.g. "Oven clean -- new lead (Meta)" or "[Missed Call/Text] - …". Display only: nothing is saved. */
+const SRC_RULES=[
+  [/\bmeta\b|facebook|instagram/i,'Meta'],
+  [/brevo/i,'Brevo'],
+  [/missed\s*call|call\s*\/\s*text/i,'Missed call/text'],
+  [/google/i,'Google'],
+  [/website|web\s*form/i,'Website'],
+  [/referr/i,'Referral'],
+  [/repeat/i,'Repeat client'],
+  [/^phone$/i,'Phone'],
+];
+const SRC_COLORS={'Meta':'#1877f2','Brevo':'#0b8a62','Missed call/text':'#7c3aed','Google':'#d93025','Website':'#e8590c','Referral':'#b7791f','Repeat client':'#8b5e34','Phone':'#0e7490'};
+const SRC_EXTRA=['#be185d','#4d7c0f','#0369a1','#9333ea','#a16207'];
+function leadSource(l){
+  const svc=l.service||'';
+  const tag=(svc.match(/new lead\s*\(([^)]+)\)/i)||svc.match(/^\s*\[([^\]]+)\]/)||[])[1]||'';
+  for(const [re,name] of SRC_RULES)if(re.test(tag))return name;
+  if(tag.trim())return tag.trim().slice(0,24);
+  for(const [re,name] of SRC_RULES)if(re.test(svc)||re.test(l.source||''))return name;
+  return l.source||'Other';
+}
+function srcColor(name){
+  if(SRC_COLORS[name])return SRC_COLORS[name];
+  if(/^(servicem8|zapier|other)$/i.test(name))return'';
+  let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;
+  return SRC_EXTRA[h%SRC_EXTRA.length];
+}
+function srcChip(l){
+  const n=leadSource(l),c=srcColor(n);
+  return `<span class="chip src${c?' srcc':''}"${c?` style="--srcc:${c}"`:''}>${esc(n)}</span>`;
 }
 function fuChip(l){
   if(!l.followUp||TERMINAL_STAGES.includes(l.stage))return'';
@@ -2071,7 +2104,7 @@ function renderTable(){
         <td>${esc(l.service)}</td>
         <td>${esc(l.suburb||'—')}${l.address?`<br><a class="tel" style="font-size:12px;color:var(--muted)" href="${mapsLink(l)}" target="_blank" rel="noopener">${esc(l.address)}</a>`:''}</td>
         <td style="font-weight:800">${money(l.value)||'—'}</td>
-        <td>${esc(l.source)}</td>
+        <td>${srcChip(l)}</td>
         <td><span class="badge" style="background:${st.color}1a;color:${st.color}"><i></i>${st.name}</span></td>
         <td style="white-space:nowrap">${fuCellSelect(l)}</td>
         <td style="color:var(--muted);white-space:nowrap">${fdate(l.createdAt)}</td>
