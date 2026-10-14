@@ -19,7 +19,7 @@ Single-file CRM (`index.html`) for Rapid Oven Cleaning (Sydney oven/BBQ cleaning
 
 ## Layout ("Sunrise" redesign, Oct 2026)
 
-- Warm light theme (`--bg:#fff8f1`, orange accent, rounded font). Desktop (≥900px): fixed left sidebar nav. Phone (<900px): bottom tab bar Leads · Today · Clients · Jobs · More, a floating + New lead button, stage chips + big cards instead of the sideways Pipeline board. Lead editor and bulk SMS are a bottom sheet on phone and a right-hand drawer on desktop.
+- Warm light theme (`--bg:#fff8f1`, orange accent, rounded font). Desktop (≥900px): fixed left sidebar nav. Phone (<900px): bottom tab bar Leads · Today · Clients · Jobs · More, an orange + New lead button in the top bar next to the account button (it used to float bottom-right but covered the Follow up / Contacted buttons), stage chips + big cards instead of the sideways Pipeline board. Lead editor and bulk SMS are a bottom sheet on phone and a right-hand drawer on desktop.
 - The Today page (follow-ups due, new leads, today's ServiceM8 jobs) reuses the Job Count tab's existing `job_count_daily` query (same 3-week window); it adds no new database reads or writes.
 - Pre-redesign version is tagged `backup-before-sunrise` (also on GitHub) if a rollback is ever needed.
 
