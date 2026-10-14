@@ -263,6 +263,7 @@
   .trow .t{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .trow .t em{font-style:normal;color:var(--muted);font-weight:800;font-size:13.5px;margin-left:4px}
   .trow .s{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow .s.fuwhen{white-space:normal;overflow:visible;color:var(--ink-2,var(--muted));font-weight:700}
   .trow .s .over{color:var(--bad);font-weight:800}
   .trow .s .today{color:var(--warn);font-weight:800}
   .trow .tacts{display:flex;gap:8px;flex-shrink:0}
@@ -2949,10 +2950,12 @@ function renderTodayFollowup(){
     :'Leads show here for 3 days after D1 is ticked, until D2 is ticked.';
   el.innerHTML=list.map(l=>{
     const st=stageMap[l.stage],tel=dialNum(l.phone),sms=followupSmsHref(l);
-    const sub=['D1 '+fmtDT(d1TickedAt(l)),esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
+    // Tick time shown in full: may wrap, but only after the date ("D1 12 Oct," / "12:30pm").
+    const when='D1 '+fmtDT(d1TickedAt(l)).replace(/ /g,'\u00a0').replace(',\u00a0',', ');
+    const sub=[esc(st?st.name:''),esc(l.suburb||'')].filter(Boolean).join(' · ');
     return `<div class="trow fu" onclick="openModal('${l.id}')">
       <div class="av">${esc(avInitials(l.name))}</div>
-      <div class="who"><div class="t">${esc(l.name)}</div><div class="s">${sub}</div></div>
+      <div class="who"><div class="t">${esc(l.name)}</div><div class="s fuwhen">${esc(when)}</div>${sub?`<div class="s">${sub}</div>`:''}</div>
       ${sms?`<div class="tacts" onclick="event.stopPropagation()"><a class="ib call" href="tel:${tel}" title="Call ${esc(l.phone)}" aria-label="Call">${IC.call}</a><a class="revbtn fubtn" href="${esc(sms)}" onclick="sendFollowup('${l.id}')">Follow up</a></div>`:'<span class="revnone">No number</span>'}
     </div>`;
   }).join('')||'<div class="tempty">Nothing to follow up right now.</div>';
