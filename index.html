@@ -3007,6 +3007,8 @@ function todayReviewTpl(){
   return pool[((day%pool.length)+pool.length)%pool.length];
 }
 function reviewTplText(){const t=todayReviewTpl();return t?t.text:'';}
+/* Job Count jobs[] status: Quote, Work Order, or Completed (kept so a day's jobs don't vanish once done). */
+function jobKind(j){return j.status==='Quote'?'Quote':j.status==='Completed'?'Done':'Work order';}
 function jobLead(j){return j.leadId?leads.find(l=>l.id===j.leadId):null;}
 const REVIEW_SENT_KEY='rocReviewsSent';
 function revSentLocal(){try{return JSON.parse(localStorage.getItem(REVIEW_SENT_KEY)||'{}')||{};}catch(_){return{};}}
@@ -3061,7 +3063,7 @@ function renderTodayReviews(){
       :at?`<button class="revbtn sent" onclick="sendReview(${i})" title="Send again">✓ Sent ${esc(new Date(at).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}))}</button>`
       :`<button class="revbtn" onclick="sendReview(${i})">⭐ Send</button>`;
     return head+`<div class="trow job rev${q?' q':''}">
-      <div class="tt">${esc(fmtTime12(j.time))||'—'}<small>${q?'Quote':'Work order'}</small></div>
+      <div class="tt">${esc(fmtTime12(j.time))||'—'}<small>${jobKind(j)}</small></div>
       <div class="who"><div class="t">${esc(j.customer)}</div><div class="s">${esc((j.description||'').trim())}</div></div>
       ${btn}
     </div>`;
@@ -3082,7 +3084,7 @@ function renderTodayJobs(){
   el.innerHTML=jobs.map(j=>{
     const who=jcWho(j),q=j.status==='Quote';
     return `<div class="trow job${q?' q':''}" onclick="this.classList.toggle('open')" title="Tap for the full description">
-      <div class="tt">${esc(fmtTime12(j.time))||'—'}<small>${q?'Quote':'Work order'}</small></div>
+      <div class="tt">${esc(fmtTime12(j.time))||'—'}<small>${jobKind(j)}</small></div>
       <div class="who"><div class="t">${esc(j.customer)}</div><div class="s">${esc((j.description||'').trim())}</div></div>
       <div class="r"><div class="av sm staffav" title="${esc(who)}">${who==='Unassigned'?'?':esc(initials(who))}</div><small>${esc(who.split(/\s+/)[0])}</small></div>
     </div>`;
