@@ -1356,6 +1356,11 @@ let jobTarget = 90;
 let todoXp = 0;
 const XP_PER_TASK=20, XP_PER_LEVEL=100;
 const DOW=[['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
+/* Today › Reviews rotates through these one per day (one Google page each). Added to saved templates
+   when missing, so they can be edited in the lead editor like any other template. */
+const REVIEW_TPLS=['CRBQWvLOqAS0EAg','CQsQOEtqCFXJEBM','CcLwkZN5Ij_3EAI'].map((g,i)=>({name:'Review '+(i+1),
+  text:'Hi {name}\n\nThank you for booking in with Rapid Oven Cleaning. To ensure we continuously deliver a quality service to our customers, don\'t forget to leave us a google review and let us know how your experience was with the team.\n\nhttps://g.page/r/'+g+'/review\n\nRegards,\nRapid Oven Cleaning'}));
+function withReviewTpls(list){REVIEW_TPLS.forEach(r=>{if(!list.some(t=>t.name===r.name))list.push({...r});});return list;}
 let tpls = [
   {name:'New enquiry reply',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
   {name:'Quote follow-up',text:'Hi {name}, just checking in on the quote we sent for your {service}{value}. Happy to answer any questions or book in a time that suits you. — Rapid Oven Cleaning'},
@@ -1364,6 +1369,7 @@ let tpls = [
   {name:'Review request',text:'Hi {name}, thanks for having Rapid Oven Cleaning out for your {service}! If you were happy with the result, a quick Google review would mean the world to us. Cheers!'},
   {name:'Lost Lead',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
   {name:'Closed — Lost',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
+  ...REVIEW_TPLS,
 ];
 let loading = true;
 /* Writes are refused until the initial load succeeds, so a failed or signed-out load can never
@@ -1470,7 +1476,7 @@ async function init(){
     const cfg=await fetchAll('config');
     const cfgData=cfg[0]&&cfg[0].data||{};
     if(cfgData.staff)staff=cfgData.staff;
-    if(cfgData.tpls)tpls=cfgData.tpls;
+    if(cfgData.tpls)tpls=withReviewTpls(cfgData.tpls);
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
     if(cfgData.todoXp)todoXp=cfgData.todoXp;
     loadOk=true;
@@ -1519,7 +1525,7 @@ function startRealtime(){
     if(!cfg.length){checkSessionSoon();return;}
     const cfgData=cfg[0].data||{};
     if(cfgData.staff)staff=cfgData.staff;
-    if(cfgData.tpls)tpls=cfgData.tpls;
+    if(cfgData.tpls)tpls=withReviewTpls(cfgData.tpls);
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
     if(cfgData.todoXp!==undefined)todoXp=cfgData.todoXp;
     if(!loading)fillStaffSelect();
@@ -2993,7 +2999,14 @@ function renderTodayFollowup(){
     </div>`;
   }).join('')||'<div class="tempty">Nothing to follow up right now.</div>';
 }
-function reviewTplText(){const t=tpls.find(x=>/review/i.test(x.name||''))||tpls[4]||tpls[0];return t?t.text:'';}
+/* One review text per calendar day, Review 1 → 2 → 3 → 1… (Review 1 on 15 Oct 2026), so reviews spread across the Google pages. */
+function todayReviewTpl(){
+  const pool=tpls.filter(x=>/^review \d+$/i.test(x.name||''));
+  if(!pool.length)return tpls.find(x=>/review/i.test(x.name||''))||tpls[4]||tpls[0];
+  const d=new Date(),day=Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(2026,9,15))/864e5);
+  return pool[((day%pool.length)+pool.length)%pool.length];
+}
+function reviewTplText(){const t=todayReviewTpl();return t?t.text:'';}
 function jobLead(j){return j.leadId?leads.find(l=>l.id===j.leadId):null;}
 const REVIEW_SENT_KEY='rocReviewsSent';
 function revSentLocal(){try{return JSON.parse(localStorage.getItem(REVIEW_SENT_KEY)||'{}')||{};}catch(_){return{};}}
@@ -3032,7 +3045,8 @@ function renderTodayReviews(){
   const after7=new Date().getHours()>=19;
   note.textContent=!todayRevJobs.length?'No jobs booked today, so no reviews to send.'
     :(after7?`It’s after 7pm — ${toSend} review${toSend===1?'':'s'} left to send`:`Send these from 7pm tonight`)+` · ${sent}/${todayRevJobs.length} sent`
-    +(anyPhone?'':' · phone numbers arrive with the next hourly sync');
+    +(anyPhone?'':' · phone numbers arrive with the next hourly sync')
+    +(todayRevJobs.length?` · using ${(todayReviewTpl()||{}).name||'review'} today`:'');
   if(!todayRevJobs.length){el.innerHTML='<div class="tempty">No jobs booked today.</div>';return;}
   let lastWho=null;
   el.innerHTML=todayRevJobs.map((j,i)=>{
