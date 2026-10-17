@@ -1357,9 +1357,10 @@ let todoXp = 0;
 const XP_PER_TASK=20, XP_PER_LEVEL=100;
 const DOW=[['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
 /* Today › Reviews rotates through these one per day (one Google page each). Added to saved templates
-   when missing, so they can be edited in the lead editor like any other template. */
+   when missing, so they can be edited in the lead editor like any other template. Kept to 160 plain
+   characters (1 SMS credit) and identical to REVIEW_DEFAULTS in the n8n "Nightly Review Texts" workflow. */
 const REVIEW_TPLS=['CRBQWvLOqAS0EAg','CQsQOEtqCFXJEBM','CcLwkZN5Ij_3EAI'].map((g,i)=>({name:'Review '+(i+1),
-  text:'Hi {name}\n\nThank you for booking in with Rapid Oven Cleaning. To ensure we continuously deliver a quality service to our customers, don\'t forget to leave us a google review and let us know how your experience was with the team.\n\nhttps://g.page/r/'+g+'/review\n\nRegards,\nRapid Oven Cleaning'}));
+  text:'Hi {name}, thanks for choosing Rapid Oven Cleaning! How did we go? A quick Google review would mean a lot: https://g.page/r/'+g+'/review'}));
 function withReviewTpls(list){REVIEW_TPLS.forEach(r=>{if(!list.some(t=>t.name===r.name))list.push({...r});});return list;}
 let tpls = [
   {name:'New enquiry reply',text:'Hi {name},\n\nBrenna here from Rapid Oven Cleaning. Thanks for your enquiry! I just tried to give you a quick call.\n\nIf you’d like a quote all i need to know is if you have a standard, wide oven or BBQ ?\n\nThanks, \nRapid Oven Cleaning'},
@@ -2942,7 +2943,8 @@ async function loadTodayJobs(){
 /* ---------- Today › Reviews ----------
    Today's Job Count jobs with a one-tap review text. Phone + leadId come from the Job Count Tracker
    (n8n) on each jobs[] entry. Sending opens the phone's Messages pre-filled (nothing is sent by the CRM)
-   and stamps reviewSentAt on the CRM lead so the job shows as sent on every device. */
+   and stamps reviewSentAt on the CRM lead so the job shows as sent on every device. The n8n "Nightly
+   Review Texts" workflow texts everyone not yet sent at 7:10pm and stamps reviewSentAt the same way. */
 let todayTab='overview',todayRevJobs=[];
 function setTodayTab(t){
   todayTab=t;
@@ -3032,7 +3034,7 @@ function renderTodayReviews(){
   const el=document.getElementById('todayRevList'),note=document.getElementById('revNote'),badge=document.getElementById('todayRevN');
   if(!el)return;
   if(!jcLoadedAt){
-    badge.textContent='';note.textContent='Tonight’s review texts go out from 7pm.';
+    badge.textContent='';note.textContent='Review texts go out automatically at 7:10pm.';
     el.innerHTML=`<div class="tempty">${todayJcErr?'Couldn’t load today’s jobs — try again shortly.':'Loading today’s jobs…'}</div>`;
     return;
   }
@@ -3044,9 +3046,8 @@ function renderTodayReviews(){
   const toSend=todayRevJobs.filter(j=>j.phone&&!reviewSentAt(j)).length;
   const anyPhone=todayRevJobs.some(j=>j.phone);
   badge.textContent=toSend||'';
-  const after7=new Date().getHours()>=19;
   note.textContent=!todayRevJobs.length?'No jobs booked today, so no reviews to send.'
-    :(after7?`It’s after 7pm — ${toSend} review${toSend===1?'':'s'} left to send`:`Send these from 7pm tonight`)+` · ${sent}/${todayRevJobs.length} sent`
+    :`Texts go out automatically at 7:10pm · ${sent}/${todayRevJobs.length} sent`
     +(anyPhone?'':' · phone numbers arrive with the next hourly sync')
     +(todayRevJobs.length?` · using ${(todayReviewTpl()||{}).name||'review'} today`:'');
   if(!todayRevJobs.length){el.innerHTML='<div class="tempty">No jobs booked today.</div>';return;}
