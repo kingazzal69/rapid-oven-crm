@@ -531,6 +531,15 @@
   .jcstrip{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 2px 8px;margin-bottom:10px;scroll-snap-type:x proximity}
   .jcdchip{flex:0 0 auto;min-width:74px;background:var(--panel);border:1.5px solid var(--line);border-radius:18px;padding:9px 6px;text-align:center;color:var(--ink);scroll-snap-align:start;min-height:44px}
   .jcdchip.on{border-color:var(--accent);background:var(--accent-soft)}
+  /* Weekly totals: a M T W T F S S strip under each week, jobs booked / rostered capacity per day */
+  #jcWeekBody tr.jcwkrow td{border-bottom:none;padding-bottom:4px}
+  #jcWeekBody tr.jcwkdays td{padding-top:0;padding-bottom:12px}
+  .jcwdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;max-width:460px}
+  .jcwd{background:var(--panel-3);border-radius:8px;padding:4px 0 5px;text-align:center;font-size:11.5px;font-weight:700;color:var(--ink-2);line-height:1.25}
+  .jcwd b{display:block;font-size:10px;font-weight:800;color:var(--muted)}
+  .jcwd.full{color:var(--green)}
+  .jcwd.none{color:var(--muted);opacity:.6}
+  .jcwd.today{box-shadow:inset 0 0 0 1.5px var(--accent)}
   .jcdchip .dd{font-size:12px;font-weight:800;color:var(--muted)}
   .jcdchip .dn{font-size:20px;font-weight:900;line-height:1.25}
   .jcdchip .df{font-size:12px;font-weight:900;color:var(--accent-dark)}
@@ -2844,9 +2853,10 @@ async function renderJobCount(){
   const weekMap=new Map();
   for(const r of rows){
     const wk=jcMondayOf(r.date);
-    if(!weekMap.has(wk))weekMap.set(wk,{dates:[],quotes:0,work_orders:0,total:0});
+    if(!weekMap.has(wk))weekMap.set(wk,{monday:wk,dates:[],booked:{},quotes:0,work_orders:0,total:0});
     const w=weekMap.get(wk);
     w.dates.push(r.date);
+    w.booked[r.date]=Array.isArray(r.jobs)?r.jobs.length:(+r.total||0); // same count as the Staff Schedule day title
     w.quotes+=+r.quotes||0;
     w.work_orders+=+r.work_orders||0;
     w.total+=+r.total||0;
@@ -2861,13 +2871,21 @@ async function renderJobCount(){
     const neededCell=weekGap>0&&remainingDays>0
       ?`<span style="color:var(--red)">${(weekGap/remainingDays).toFixed(1)}/day</span>`
       :`<span style="color:var(--green)">On track</span>`;
-    return `<tr>
+    // One small M T W T F S S cell per day: jobs booked / rostered capacity (jcDayCap), "–" for days outside the window.
+    const dayCells=[0,1,2,3,4,5,6].map(i=>{
+      const d=new Date(w.monday+'T00:00:00');d.setDate(d.getDate()+i);
+      const ds=dToStr(d.getTime()),n=w.booked[ds],cap=jcDayCap(ds);
+      const cls=n===undefined?' none':n>=cap?' full':'';
+      return `<div class="jcwd${cls}${ds===today?' today':''}"><b>${'MTWTFSS'[i]}</b>${n===undefined?'–':n+'/'+cap}</div>`;
+    }).join('');
+    return `<tr class="jcwkrow">
       <td class="name-cell">${label}<br><small style="color:var(--muted)">${range}</small></td>
       <td>${w.quotes}</td>
       <td>${w.work_orders}</td>
       <td style="font-weight:700">${w.total}</td>
       <td>${neededCell}</td>
-    </tr>`;
+    </tr>
+    <tr class="jcwkdays"><td colspan="5"><div class="jcwdays">${dayCells}</div></td></tr>`;
   }).join('');
   const t=todayStr();
   const staffMode=rows.some(r=>jcHasStaff(r.jobs));
