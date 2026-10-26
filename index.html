@@ -200,7 +200,7 @@
   .stagesel:hover,.stagesel:focus{border-color:var(--accent);outline:none}
   .age{font-size:11.5px;color:var(--faint);font-weight:600}
   .cmeta .age{margin-left:auto;white-space:nowrap}
-  .dfoot{display:flex;align-items:center;gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line-2)}
+  .dfoot{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line-2)}
   .dfoot .sp{flex:1}
   .upd{font-size:11px;color:var(--faint);margin-top:5px;font-weight:600}
   /* D1 / D2 / D3 toggles: real checkboxes, styled as pills */
@@ -245,7 +245,7 @@
   .act:active{transform:scale(.97)}
   .act.go{background:var(--grad);color:#fff;font-size:14.5px}
   .act.go span{overflow:hidden;text-overflow:ellipsis}
-  .track{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+  .track{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
   .track .tk span{min-width:52px;height:44px;font-size:13px}
   .track .stagesel{margin-left:auto;min-height:44px;font-size:16px;max-width:none;flex:1;min-width:0;padding:6px 30px 6px 12px;background-position:right 12px center}
   .pcard .upd{margin-top:8px}
@@ -1843,11 +1843,11 @@ function toggleCol(id){
   localStorage.setItem('collapsedStages',JSON.stringify([...collapsedStages]));
   document.querySelector(`.col[data-stage="${id}"]`)?.classList.toggle('collapsed');
 }
-/* D1/D2/D3: real checkboxes (toggleFlag on change), drawn as pills. */
+/* D1/D2/D3 + Called: real checkboxes (toggleFlag on change), drawn as pills. Called never moves the stage. */
 function tkHtml(l,k){
-  const titles={d1:'Day 1 follow-up done',d2:'Day 2 follow-up done',d3:'Day 3 follow-up done'};
+  const titles={d1:'Day 1 follow-up done',d2:'Day 2 follow-up done',d3:'Day 3 follow-up done',called:'Called them'};
   const at=l[k]&&l[k+'At']?' · ticked '+fmtDT(l[k+'At']):'';
-  return `<label class="tk" title="${titles[k]}${at}"><input type="checkbox" ${l[k]?'checked':''} onchange="toggleFlag('${l.id}','${k}',this.checked)"><span>${k.toUpperCase()}</span></label>`;
+  return `<label class="tk" title="${titles[k]}${at}"><input type="checkbox" ${l[k]?'checked':''} onchange="toggleFlag('${l.id}','${k}',this.checked)"><span>${k==='called'?'Called':k.toUpperCase()}</span></label>`;
 }
 function stageSelHtml(l){
   return `<select class="stagesel" title="Move to another stage" aria-label="Stage" onclick="event.stopPropagation()" onchange="event.stopPropagation();moveLeadTo('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.id}"${s.id===l.stage?' selected':''}>${esc(s.name)}</option>`).join('')}</select>`;
@@ -1876,7 +1876,7 @@ function cardEl(l){
     <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
     <div class="cmeta" onclick="event.stopPropagation()">${stageSelHtml(l)}<span class="age">Added ${ago(l.createdAt)}</span></div>
     <div class="dfoot trackrow" onclick="event.stopPropagation()">
-      ${tkHtml(l,'d1')}${tkHtml(l,'d2')}${tkHtml(l,'d3')}<span class="sp"></span>
+      ${tkHtml(l,'d1')}${tkHtml(l,'d2')}${tkHtml(l,'d3')}${tkHtml(l,'called')}<span class="sp"></span>
       ${l.phone?`<a class="ib call" href="tel:${tel}" title="Call ${esc(l.phone)}" aria-label="Call">${IC.call}</a><button class="ib" onclick="quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written" aria-label="Text">${IC.sms}</button>`:''}
       ${nextStage?`<button class="ib go" onclick="advanceStage('${l.id}')" title="Move to ${esc(nextStage.name)}" aria-label="Move to ${esc(nextStage.name)}">${IC.next}</button>`:''}
     </div>
@@ -1906,7 +1906,7 @@ function pcardEl(l,showStage){
       ${l.phone?`<a class="act" href="tel:${tel}">${IC.call}Call</a><button class="act" onclick="quickSms('${l.id}')" title="Opens your phone's SMS app with a reply pre-written">${IC.sms}Text</button>`:''}
       ${nextStage?`<button class="act go" onclick="advanceStageToast('${l.id}')" aria-label="Move to ${esc(nextStage.name)}">${IC.next}<span>${esc(STAGE_SHORT[nextStage.id]||nextStage.name)}</span></button>`:`<button class="act" onclick="openModal('${l.id}')">Open</button>`}
     </div>
-    <div class="track" onclick="event.stopPropagation()">${tkHtml(l,'d1')}${tkHtml(l,'d2')}${tkHtml(l,'d3')}${stageSelHtml(l)}</div>
+    <div class="track" onclick="event.stopPropagation()">${tkHtml(l,'d1')}${tkHtml(l,'d2')}${tkHtml(l,'d3')}${tkHtml(l,'called')}${stageSelHtml(l)}</div>
     ${l.trackedAt?`<div class="upd">Updated ${fmtDT(l.trackedAt)}</div>`:''}`;
   d.addEventListener('click',()=>openModal(l.id));
   return d;
