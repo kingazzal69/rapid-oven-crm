@@ -535,7 +535,10 @@
   #jcWeekBody tr.jcwkrow td{border-bottom:none;padding-bottom:4px}
   #jcWeekBody tr.jcwkdays td{padding-top:0;padding-bottom:12px}
   .jcwdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;max-width:460px}
-  .jcwd{background:var(--panel-3);border-radius:8px;padding:4px 0 5px;text-align:center;font-size:11.5px;font-weight:700;color:var(--ink-2);line-height:1.25}
+  .jcwd{background:var(--panel-3);border:0;border-radius:8px;padding:4px 0 5px;min-height:36px;text-align:center;font:inherit;font-size:11.5px;font-weight:700;color:var(--ink-2);line-height:1.25}
+  button.jcwd{cursor:pointer}
+  button.jcwd:active{background:var(--accent-soft)}
+  #jcStaffWrap,#jcBody tr{scroll-margin-top:90px} /* day boxes scroll here; keep clear of the sticky top bar */
   .jcwd b{display:block;font-size:10px;font-weight:800;color:var(--muted)}
   .jcwd.full{color:var(--green)}
   .jcwd.none{color:var(--muted);opacity:.6}
@@ -2779,6 +2782,21 @@ async function jcFetchRows(){
   return data||[];
 }
 function jcPickDay(date){jcSelDay=date;renderJcSchedule();}
+/* Weekly totals day box: today/upcoming days open in the Staff Schedule, past days open their Daily Breakdown row. */
+function jcOpenDay(date){
+  const sched=document.getElementById('jcStaffWrap');
+  if(date>=todayStr()&&!sched.classList.contains('hide')){
+    jcPickDay(date);
+    const chip=document.querySelector('#jcStrip .jcdchip.on');
+    if(chip)chip.scrollIntoView({block:'nearest',inline:'center'});
+    sched.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  const el=document.getElementById('jcDay-'+date);
+  if(!el)return;
+  if(el.classList.contains('hide'))jcToggleDay(date);
+  el.previousElementSibling.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function renderJcSchedule(){
   const wrap=document.getElementById('jcStaffWrap');
   const t=todayStr();
@@ -2876,7 +2894,8 @@ async function renderJobCount(){
       const d=new Date(w.monday+'T00:00:00');d.setDate(d.getDate()+i);
       const ds=dToStr(d.getTime()),n=w.booked[ds],cap=jcDayCap(ds);
       const cls=n===undefined?' none':n>=cap?' full':'';
-      return `<div class="jcwd${cls}${ds===today?' today':''}"><b>${'MTWTFSS'[i]}</b>${n===undefined?'–':n+'/'+cap}</div>`;
+      if(n===undefined)return `<div class="jcwd none"><b>${'MTWTFSS'[i]}</b>–</div>`;
+      return `<button type="button" class="jcwd${cls}${ds===today?' today':''}" onclick="event.stopPropagation();jcOpenDay('${ds}')" aria-label="Open ${fmtD(ds)}"><b>${'MTWTFSS'[i]}</b>${n}/${cap}</button>`;
     }).join('');
     return `<tr class="jcwkrow">
       <td class="name-cell">${label}<br><small style="color:var(--muted)">${range}</small></td>
