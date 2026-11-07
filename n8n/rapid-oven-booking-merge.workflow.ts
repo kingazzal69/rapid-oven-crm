@@ -2,7 +2,7 @@ import { workflow, node, trigger, sticky, ifElse, expr } from '@n8n/workflow-sdk
 
 // Rapid Oven – Booking Merge. Every 3 minutes (offset from Lead Sync and the Instant Lead Reply) finds booked jobs
 // (any lead booked in Job Count, plus "[Booking Bot]" and "Customer booked ... online" leads) that are the same customer as a
-// Contacted enquiry with the same AU mobile, and merges them: the booking keeps its address, gets the
+// Contacted or Follow Up enquiry with the same AU mobile, and merges them: the booking keeps its address, gets the
 // enquiry's history/tick boxes and moves to Closed — Won; the enquiry is archived (never deleted) with mergedInto.
 // Nothing else is touched. Build Merges has DRY_RUN at the top: true = Telegram "would merge" notes only, no CRM changes.
 
@@ -89,7 +89,7 @@ const buildMerges = node({
     position: [720, 300],
     executeOnce: true,
     parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: 
-        "// Finds booked jobs with the same AU mobile as a Contacted enquiry, and plans the merge. One output item: the plan.\n" +
+        "// Finds booked jobs with the same AU mobile as a Contacted or Follow Up enquiry, and plans the merge. One output item: the plan.\n" +
         "// DRY_RUN = true: changes nothing in the CRM, just a Telegram \"would merge\" note per pair (once each).\n" +
         "const DRY_RUN = false;\n" +
         "const BOOKING_DAYS = 7;        // bookings that came in during the last 7 days\n" +
@@ -141,7 +141,8 @@ const buildMerges = node({
         "\n" +
         "const bookings = leads.filter(l => /^sm8_/.test(l.id) && !l.archived && isBooking(l) && !['lost', 'deadlead'].includes(l.stage)\n" +
         "  && Number(l.createdAt) >= nowMs - BOOKING_DAYS * 864e5).sort((a, b) => Number(a.createdAt) - Number(b.createdAt));\n" +
-        "const enquiries = leads.filter(l => l.stage === 'contacted' && !l.archived && !l.mergedInto && !isBooking(l));\n" +
+        "// Follow Up too: the D2 Follow Up workflow moves texted enquiries there.\n" +
+        "const enquiries = leads.filter(l => ['contacted', 'followup'].includes(l.stage) && !l.archived && !l.mergedInto && !isBooking(l));\n" +
         "\n" +
         "const pairs = [];   // { booking, enqs: [{ lead, how }] }\n" +
         "const used = new Set();\n" +
@@ -171,7 +172,7 @@ const buildMerges = node({
         "    add.push({ ts: nowMs, text: 'Merged with ' + (ch ? ch + ' ' : '') + 'enquiry from ' + day(e.createdAt) + (nice(e.name) !== nice(b.name) ? ' (' + nice(e.name) + ')' : '') });\n" +
         "    // Tick boxes, auto-reply and review stamps carry over, so nothing re-texts this customer.\n" +
         "    for (const k of ['d1', 'd2', 'd3', 'called']) if (e[k] && !data[k]) { data[k] = true; if (e[k + 'At']) data[k + 'At'] = e[k + 'At']; }\n" +
-        "    for (const k of ['autoReplyAt', 'reviewSentAt', 'trackedAt']) if (Number(e[k]) > (Number(data[k]) || 0)) data[k] = e[k];\n" +
+        "    for (const k of ['autoReplyAt', 'd2AutoAt', 'reviewSentAt', 'trackedAt']) if (Number(e[k]) > (Number(data[k]) || 0)) data[k] = e[k];\n" +
         "    if (!data.email && e.email) data.email = e.email;\n" +
         "    const en = String(e.notes || '').trim();\n" +
         "    if (en && en !== String(e.service || '').trim() && !String(data.notes || '').includes(en)) data.notes = (String(data.notes || '').trim() + NL + NL + 'Enquiry (' + (ch || 'earlier') + ', ' + day(e.createdAt) + '): ' + en).trim();\n" +
@@ -317,9 +318,9 @@ const telegram = node({
 const readme = sticky(
   '## Booking merge\n\n' +
     'Every 3 min: a booked job (booked in Job Count, [Booking Bot] or "Customer booked ... online", last 7 days, not Lost)\n' +
-    'with the same AU mobile as a Contacted enquiry (up to 30 days older) is merged:\n' +
+    'with the same AU mobile as a Contacted or Follow Up enquiry (up to 30 days older) is merged:\n' +
     'booking -> Closed — Won with the enquiry history, tick boxes, email, notes and mergedFrom;\n' +
-    'enquiry -> archived + mergedInto (never deleted). Only Contacted enquiries, nothing else is touched.\n' +
+    'enquiry -> archived + mergedInto (never deleted). Only Contacted / Follow Up enquiries, nothing else is touched.\n' +
     'Any failed lookup or more than 20 merges at once = nothing merged. DRY_RUN at the top of Build Merges.',
   [every3, fetchLeads, fetchBooked, buildMerges],
   { color: 5 },
