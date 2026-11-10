@@ -526,6 +526,11 @@
   .jcjob.open .d{display:block}
   .jcjob .p{display:none;font-weight:700;margin-top:3px;overflow-wrap:anywhere}
   .jcjob.open .p{display:block}
+  .jcjob{position:relative}
+  .jcjob.hassms .t{padding-right:26px}
+  .jcsms{position:absolute;top:2px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.75);color:var(--accent-dark);display:flex;align-items:center;justify-content:center}
+  .jcsms svg{width:14px;height:14px}
+  .jcsms:hover{background:#fff}
   .jclegend{font-size:12.5px;color:var(--muted);margin:2px 0 8px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-weight:600}
   .jclegend i{display:inline-block;width:10px;height:10px;border-radius:4px;margin-right:4px;vertical-align:-1px;background:var(--good)}
   .jclegend i.q{background:var(--purple)}
@@ -2739,7 +2744,9 @@ function jcBookedLine(jobs,name,date){
 }
 function jcJobChip(j){
   const phone=j.phone||(jobLead(j)||{}).phone;
-  return `<div class="jcjob${j.status==='Quote'?' q':''}" onclick="this.classList.toggle('open')">
+  const num=dialNum(phone);
+  return `<div class="jcjob${j.status==='Quote'?' q':''}${num?' hassms':''}" onclick="this.classList.toggle('open')">
+      ${num?`<a class="jcsms" href="sms:${num}" title="Text ${esc(j.customer)}" aria-label="Text ${esc(j.customer)}" onclick="event.stopPropagation()">${IC.sms}</a>`:''}
       <div class="t">${esc(fmtTime12(j.time))||'No time'}</div>
       <div class="c">${esc(j.customer)}</div>
       <div class="p">${phone?telLink(phone,true):'No number'}</div>
