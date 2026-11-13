@@ -538,6 +538,16 @@
   .jcstrip{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 2px 8px;margin-bottom:10px;scroll-snap-type:x proximity}
   .jcdchip{flex:0 0 auto;min-width:74px;background:var(--panel);border:1.5px solid var(--line);border-radius:18px;padding:9px 6px;text-align:center;color:var(--ink);scroll-snap-align:start;min-height:44px}
   .jcdchip.on{border-color:var(--accent);background:var(--accent-soft)}
+  /* Roster: who works which weekday (tick boxes) */
+  .jcrbtn{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:800;text-transform:none;letter-spacing:0;min-height:36px;cursor:pointer}
+  .jcrbtn.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-dark)}
+  .jcroster{background:var(--panel);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 12px 12px;margin-bottom:12px;max-width:520px}
+  .jcrgrid{display:grid;grid-template-columns:minmax(64px,1fr) repeat(7,minmax(34px,44px));align-items:center}
+  .jcrgrid b{font-size:12px;font-weight:800;color:var(--muted);text-align:center;padding-bottom:2px}
+  .jcrgrid .n{font-weight:800;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jcrgrid label{display:flex;align-items:center;justify-content:center;height:44px;cursor:pointer}
+  .jcrgrid input{width:22px;height:22px;margin:0;cursor:pointer}
+  .jcrnote{font-size:12.5px;color:var(--muted);margin-top:6px}
   /* Month label between day chips (the strip runs about two months ahead) */
   .jcmon{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;justify-content:center;padding:0 4px;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-dark);writing-mode:vertical-rl;transform:rotate(180deg)}
   /* Weekly totals: a M T W T F S S strip under each week, jobs booked / rostered capacity per day */
@@ -1069,7 +1079,8 @@
       </div>
     </div>
     <div id="jcStaffWrap" class="hide">
-      <div class="gh">Staff schedule</div>
+      <div class="gh">Staff schedule<span style="flex:1"></span><button type="button" class="jcrbtn" id="jcRosterBtn" onclick="jcToggleRosterBox()">Roster</button></div>
+      <div class="jcroster hide" id="jcRosterBox"></div>
       <div class="jcstrip" id="jcStrip"></div>
       <div id="jcCards"></div>
     </div>
@@ -1501,6 +1512,7 @@ async function init(){
     if(cfgData.staff)staff=cfgData.staff;
     if(cfgData.tpls)tpls=withReviewTpls(cfgData.tpls);
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
+    applyJcRoster(cfgData.jcRoster);
     if(cfgData.todoXp)todoXp=cfgData.todoXp;
     loadOk=true;
   }catch(e){
@@ -1550,6 +1562,7 @@ function startRealtime(){
     if(cfgData.staff)staff=cfgData.staff;
     if(cfgData.tpls)tpls=withReviewTpls(cfgData.tpls);
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
+    applyJcRoster(cfgData.jcRoster);
     if(cfgData.todoXp!==undefined)todoXp=cfgData.todoXp;
     if(!loading)fillStaffSelect();
     if(!loading)fillTplSelect();
@@ -1598,11 +1611,25 @@ async function saveConfig(){
   // Never write the in-memory defaults over the real settings row when the load failed.
   if(!loadOk){saveFailed();return;}
   const data={staff,tpls,jobTarget,todoXp};
+  if(jcRosterSaved)data.jcRoster=jcRoster; // keep the saved roster when other settings are saved
   try{
     const cfg=await fetchAll('config');
     const {error}=cfg.length
       ?await _sb.from('config').update({data,updated_at:new Date().toISOString()}).eq('id',cfg[0].id)
       :await _sb.from('config').insert({id:'default',data,updated_at:new Date().toISOString()});
+    if(error)throw error;
+  }catch(e){saveFailed(e);}
+}
+/* Roster tick: saves only jcRoster into the settings row, leaving every other saved setting exactly as it is. */
+async function saveJcRoster(){
+  if(!loadOk){saveFailed();return;}
+  const jcRoster=window.jcRosterSnapshot(); // the ticks as they are right now, before any waiting
+  try{
+    const cfg=await fetchAll('config');
+    const now=new Date().toISOString();
+    const {error}=cfg.length
+      ?await _sb.from('config').update({data:{...(cfg[0].data||{}),jcRoster},updated_at:now}).eq('id',cfg[0].id)
+      :await _sb.from('config').insert({id:'default',data:{staff,tpls,jobTarget,todoXp,jcRoster},updated_at:now});
     if(error)throw error;
   }catch(e){saveFailed(e);}
 }
@@ -2708,7 +2735,7 @@ const jcHasStaff=jobs=>(jobs||[]).some(j=>'staff' in j);
 const JC_STAFF_CAP={aaron:6,jackson:3,paras:4,kapil:5,bhuwan:5};
 // Weekly roster by day (0=Sun … 6=Sat), first names. Staff not rostered show as Off: no capacity, no free slots.
 const JC_ALL=Object.keys(JC_STAFF_CAP);
-const JC_ROSTER=[
+const JC_ROSTER_DEFAULT=[
   ['aaron','kapil','paras'],   // Sun
   ['aaron','jackson','bhuwan'],// Mon
   JC_ALL,                      // Tue
@@ -2717,8 +2744,15 @@ const JC_ROSTER=[
   JC_ALL,                      // Fri
   ['aaron','kapil','paras'],   // Sat
 ];
+// The roster in use: the default above until someone ticks the Roster boxes (saved as config.data.jcRoster, same shape).
+let jcRoster=JC_ROSTER_DEFAULT.map(d=>[...d]),jcRosterSaved=false;
+window.jcRosterSnapshot=()=>jcRoster.map(d=>[...d]);
+function applyJcRoster(v){
+  if(!Array.isArray(v)||v.length!==7||!v.every(Array.isArray))return;
+  jcRoster=v.map(d=>JC_ALL.filter(k=>d.includes(k)));jcRosterSaved=true;
+}
 const jcFirst=n=>n.trim().split(/\s+/)[0].toLowerCase();
-function jcOn(name,date){const k=jcFirst(name);return !(k in JC_STAFF_CAP)||JC_ROSTER[new Date(date+'T00:00:00').getDay()].includes(k);}
+function jcOn(name,date){const k=jcFirst(name);return !(k in JC_STAFF_CAP)||jcRoster[new Date(date+'T00:00:00').getDay()].includes(k);}
 function jcCapOf(name,date){return name==='Unassigned'||!jcOn(name,date)?0:(JC_STAFF_CAP[jcFirst(name)]??JC_SLOTS.length);}
 function jcRosterNames(){
   // Full ServiceM8 names come from any job in the loaded days; a staff member with none yet shows by first name.
@@ -2740,7 +2774,7 @@ function jcFreeSlotIdx(jobs,name,date){
   return JC_SLOTS.map((_,i)=>i).filter(i=>!jcInSlot(jobs,name,i).length).slice(0,room);
 }
 // Day totals are overall: every job booked that day (unassigned included) against the combined capacity of the staff rostered on.
-function jcDayCap(date){return JC_ROSTER[new Date(date+'T00:00:00').getDay()].reduce((a,k)=>a+JC_STAFF_CAP[k],0);}
+function jcDayCap(date){return jcRoster[new Date(date+'T00:00:00').getDay()].reduce((a,k)=>a+JC_STAFF_CAP[k],0);}
 function jcDayFree(jobs,date){return Math.max(0,jcDayCap(date)-jobs.length);}
 function jcBookedLine(jobs,name,date){
   const n=jobs.filter(j=>jcWho(j)===name).length;
@@ -2798,6 +2832,28 @@ async function jcFetchRows(){
   if(error)throw error;
   return data||[];
 }
+/* Roster box (Staff Schedule heading > Roster): a row per staff member, a tick per weekday they work. */
+function jcToggleRosterBox(){
+  const box=document.getElementById('jcRosterBox'),open=box.classList.toggle('hide')===false;
+  document.getElementById('jcRosterBtn').classList.toggle('on',open);
+  if(open)renderJcRoster();
+}
+function renderJcRoster(){
+  const box=document.getElementById('jcRosterBox');
+  if(box.classList.contains('hide'))return;
+  const order=[1,2,3,4,5,6,0],full=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']; // Mon first
+  const names=jcRosterNames();
+  box.innerHTML=`<div class="jcrgrid"><div></div>${order.map(d=>`<b>${full[d].slice(0,3)}</b>`).join('')}`
+    +JC_ALL.map((k,i)=>`<div class="n">${esc(names[i].split(/\s+/)[0])}</div>`
+      +order.map(d=>`<label><input type="checkbox"${jcRoster[d].includes(k)?' checked':''} onchange="jcSetRoster('${k}',${d},this.checked)" aria-label="${esc(names[i])} works ${full[d]}"></label>`).join('')).join('')
+    +`</div><div class="jcrnote">Tick the days each person works. Unticked days show them greyed out as Off.</div>`;
+}
+function jcSetRoster(k,d,on){
+  jcRoster[d]=JC_ALL.filter(x=>x===k?on:jcRoster[d].includes(x));
+  jcRosterSaved=true;
+  saveJcRoster();
+  renderJobCount();
+}
 function jcPickDay(date){jcSelDay=date;renderJcSchedule();}
 /* Weekly totals day box: today/upcoming days open in the Staff Schedule, past days open their Daily Breakdown row. */
 function jcOpenDay(date){
@@ -2841,6 +2897,7 @@ function renderJcSchedule(){
     return `<div class="jccard${off?' off':''}"><div class="jccard-h">${esc(n)}<small>${jcBookedLine(jobs,n,day.date)}</small></div>${boxes?`<div class="jcboxes">${boxes}</div>`:''}</div>`;
   }).join('');
   document.getElementById('jcCards').innerHTML=title+JC_LEGEND+`<div class="jccards">${cards}</div>`;
+  renderJcRoster();
 }
 /* Phone: tapping the Booked tile shows/hides Weekly totals just under the tiles (desktop always shows them). */
 function jcToggleWeek(){document.querySelector('.jcwrap').classList.toggle('wkopen');}
