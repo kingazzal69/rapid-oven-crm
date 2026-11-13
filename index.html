@@ -538,6 +538,8 @@
   .jcstrip{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 2px 8px;margin-bottom:10px;scroll-snap-type:x proximity}
   .jcdchip{flex:0 0 auto;min-width:74px;background:var(--panel);border:1.5px solid var(--line);border-radius:18px;padding:9px 6px;text-align:center;color:var(--ink);scroll-snap-align:start;min-height:44px}
   .jcdchip.on{border-color:var(--accent);background:var(--accent-soft)}
+  /* Month label between day chips (the strip runs about two months ahead) */
+  .jcmon{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;justify-content:center;padding:0 4px;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-dark);writing-mode:vertical-rl;transform:rotate(180deg)}
   /* Weekly totals: a M T W T F S S strip under each week, jobs booked / rostered capacity per day */
   #jcWeekBody tr.jcwkrow td{border-bottom:none;padding-bottom:4px}
   #jcWeekBody tr.jcwkdays td{padding-top:0;padding-bottom:12px}
@@ -760,6 +762,7 @@
   }
   @media(min-width:900px){
     .jcstrip{flex-wrap:wrap;overflow:visible}
+    .jcmon{flex-basis:100%;justify-content:flex-start;writing-mode:horizontal-tb;transform:none;padding:6px 2px 0}
   }
   @media(min-width:640px) and (max-width:899px){
     #page-pipeline .wrap,#page-today .wrap{max-width:720px;margin:0 auto}
@@ -2660,7 +2663,10 @@ function renderTodoBadge(){
   setBadge('navN-todo',n);setBadge('moreN-todo',n);
 }
 
-/* ---------- Job Count (ServiceM8 dispatch-board bookings, next 3 weeks) ---------- */
+/* ---------- Job Count (ServiceM8 dispatch-board bookings) ----------
+   The n8n tracker saves one row per day from this week's Monday on. Tiles, Weekly totals and Daily breakdown cover the
+   first 3 weeks (JC_STAT_DAYS); the Staff Schedule day strip shows every day saved (about two months once the tracker sends them). */
+const JC_STAT_DAYS=21;
 function jcMondayOf(dateStr){
   const d=new Date(dateStr+'T00:00:00');
   const shift=(d.getDay()+6)%7; // Mon=0..Sun=6
@@ -2715,7 +2721,7 @@ const jcFirst=n=>n.trim().split(/\s+/)[0].toLowerCase();
 function jcOn(name,date){const k=jcFirst(name);return !(k in JC_STAFF_CAP)||JC_ROSTER[new Date(date+'T00:00:00').getDay()].includes(k);}
 function jcCapOf(name,date){return name==='Unassigned'||!jcOn(name,date)?0:(JC_STAFF_CAP[jcFirst(name)]??JC_SLOTS.length);}
 function jcRosterNames(){
-  // Full ServiceM8 names come from any job in the 3-week window; a staff member with none yet shows by first name.
+  // Full ServiceM8 names come from any job in the loaded days; a staff member with none yet shows by first name.
   const full=new Map();
   jcRows.forEach(r=>(r.jobs||[]).forEach(j=>{const n=jcWho(j),k=jcFirst(n);if(k in JC_STAFF_CAP&&!full.has(k))full.set(k,n);}));
   return JC_ALL.map(k=>full.get(k)||k[0].toUpperCase()+k.slice(1));
@@ -2787,7 +2793,7 @@ let jcRows=[],jcSelDay='';
 /* When jcRows was last loaded (0 = not loaded / failed); the Today page reuses it. */
 let jcLoadedAt=0,jcStale=false;
 async function jcFetchRows(){
-  // job_count_daily only ever holds ~21 rows (n8n self-cleans stale dates) — no pagination needed here.
+  // job_count_daily holds one row per day (about 70 at most; n8n self-cleans stale dates), well under the 1000-row cap — no pagination needed here.
   const {data,error}=await _sb.from('job_count_daily').select('*').gte('date',jcMondayOf(todayStr())).order('date',{ascending:true});
   if(error)throw error;
   return data||[];
@@ -2816,10 +2822,12 @@ function renderJcSchedule(){
   wrap.classList.remove('hide');
   if(!days.some(r=>r.date===jcSelDay))jcSelDay=days[0].date;
   const strip=document.getElementById('jcStrip'),stripLeft=strip.scrollLeft;
-  strip.innerHTML=days.map(r=>{
+  strip.innerHTML=days.map((r,i)=>{
     const jobs=r.jobs||[],free=jcDayFree(jobs,r.date);
     const note=free?free+' free':'Full';
-    return `<button class="jcdchip${r.date===jcSelDay?' on':''}" onclick="jcPickDay('${r.date}')"><div class="dd">${r.date===t?'Today':jcDayAbbr(r.date)}</div><div class="dn">${+r.date.slice(8)}</div><div class="df${free?'':' none'}">${note}</div></button>`;
+    // Month label before the first day and wherever the month changes.
+    const mon=!i||days[i-1].date.slice(0,7)!==r.date.slice(0,7)?`<div class="jcmon">${fmtD(r.date).split(' ')[1]}</div>`:'';
+    return mon+`<button class="jcdchip${r.date===jcSelDay?' on':''}" onclick="jcPickDay('${r.date}')"><div class="dd">${r.date===t?'Today':jcDayAbbr(r.date)}</div><div class="dn">${+r.date.slice(8)}</div><div class="df${free?'':' none'}">${note}</div></button>`;
   }).join('');
   strip.scrollLeft=stripLeft; // keep the day strip where it was when a day is picked
   const day=days.find(r=>r.date===jcSelDay),jobs=day.jobs||[];
@@ -2866,6 +2874,11 @@ async function renderJobCount(){
   }
   emptyEl.classList.add('hide');
   jcRows=rows;renderJcSchedule();
+  const latest=rows.reduce((a,r)=>Math.max(a,new Date(r.updated_at).getTime()||0),0);
+  // Everything below (tiles, Weekly totals, Daily breakdown) stays on the first 3 weeks; only the Staff Schedule runs further out.
+  const statEnd=new Date(jcMondayOf(todayStr())+'T00:00:00');statEnd.setDate(statEnd.getDate()+JC_STAT_DAYS);
+  const statEndStr=dToStr(statEnd.getTime());
+  rows=rows.filter(r=>r.date<statEndStr);
   const days=rows.length;
   const totalQ=rows.reduce((a,r)=>a+(+r.quotes||0),0);
   const totalWO=rows.reduce((a,r)=>a+(+r.work_orders||0),0);
@@ -2942,7 +2955,6 @@ async function renderJobCount(){
       <td colspan="4" style="background:#fafafa">${detail}</td>
     </tr>`;
   }).join('');
-  const latest=rows.reduce((a,r)=>Math.max(a,new Date(r.updated_at).getTime()||0),0);
   updEl.textContent=latest?('Updated '+ago(latest)+' · syncs every hour'):'';
 }
 
