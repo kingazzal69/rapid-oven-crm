@@ -296,6 +296,30 @@
   .revbtn{flex-shrink:0;min-height:44px;padding:0 14px;border:none;border-radius:999px;background:var(--grad);color:var(--accent-ink);font:inherit;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}
   .revbtn.fubtn{display:inline-flex;align-items:center;text-decoration:none}
   .revbtn.sent{background:var(--panel-2);color:var(--good)}
+
+  /* ---------- Shortlist (call-back list) ---------- */
+  .ib.sl{color:var(--faint)}
+  .ib.sl.on,.act.sl.on{color:var(--accent-dark);background:var(--accent-soft)}
+  .ib.sl.on svg,.act.sl.on svg{fill:currentColor}
+  .pcard .ptop .ib.sl,.crow .ib.sl{width:44px;height:44px;border-radius:50%}
+  .pcard .ptop .ib.sl svg,.crow .ib.sl svg{width:20px;height:20px}
+  .who2 .ib.sl{margin-left:auto}
+  .chip.slc{background:var(--accent-soft);color:var(--accent-dark)}
+  .sllist{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+  .slcard .actions{grid-template-columns:1fr 1fr}
+  .slcard .slwhen{font-weight:900;font-size:14.5px;white-space:nowrap;text-align:right;padding-top:2px}
+  .slcard .slwhen.over{color:var(--bad)}
+  .slcard .slwhen.today{color:var(--warn)}
+  .slcard .slwhen.none{color:var(--faint);font-weight:800}
+  .slcard .act.done{color:var(--good)}
+  .slwho{font-weight:800;font-size:17px;margin-bottom:16px}
+  .slwho small{display:block;color:var(--muted);font-weight:600;font-size:13.5px;margin-top:3px}
+  .slquick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .slquick .tbtn.on{background:var(--ink);border-color:var(--ink);color:#fff7ee}
+  #slOverlay .modal{width:440px}
+  #sl-notes{min-height:110px}
+  @media(min-width:900px){.sllist{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}#page-shortlist .board-search{margin-top:14px}}
+  @media(max-width:899px){#slOverlay .modal{width:100%}#page-shortlist .board-search{margin-top:10px}.tdtabs button{font-size:13px;gap:4px;padding:0 2px}.tdtabs .cnt{padding:1px 5px}}
   .revnone{flex-shrink:0;font-size:12px;font-weight:700;color:var(--faint);text-align:right;max-width:90px}
   @media(min-width:900px){
     .tgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"due jobs" "new jobs";grid-template-rows:auto 1fr;column-gap:24px;align-items:start}
@@ -850,6 +874,7 @@
     <button id="nav-today" class="snav" onclick="showPage('today')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg><span class="tl">Today</span><span class="n hide" id="navN-today"></span></button>
     <button id="nav-clients" class="snav" onclick="showPage('clients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 100-6M22 20c0-3-2-5-5-5"/></svg><span class="tl">Clients</span></button>
     <button id="nav-jobcount" class="snav" onclick="showPage('jobcount')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="tl"><span class="d-only">Job Count</span><span class="m-only">Jobs</span></span></button>
+    <button id="nav-shortlist" class="snav xnav" onclick="showPage('shortlist')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.8z"/></svg><span class="tl">Shortlist</span><span class="n hide" id="navN-shortlist"></span></button>
     <button id="nav-more" class="snav" onclick="openMoreSheet()" aria-label="More pages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg><span class="tl">More</span></button>
     <div class="ssep"></div>
     <button id="nav-calendar" class="snav xnav" onclick="showPage('calendar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="tl">Calendar</span></button>
@@ -896,8 +921,14 @@
     <div class="tdhead"><div class="tddate" id="todayDate"></div><div class="tdsum" id="todaySummary"></div></div>
     <div class="tdtabs" role="tablist">
       <button id="tdtab-overview" class="on" role="tab" onclick="setTodayTab('overview')">Overview</button>
-      <button id="tdtab-followup" role="tab" onclick="setTodayTab('followup')">Follow Up <span class="cnt" id="todayFuN"></span></button>
-      <button id="tdtab-reviews" role="tab" onclick="setTodayTab('reviews')">⭐ Reviews <span class="cnt" id="todayRevN"></span></button>
+      <button id="tdtab-followup" class="hide" role="tab" onclick="setTodayTab('followup')">Follow Up <span class="cnt" id="todayFuN"></span></button>
+      <button id="tdtab-reviews" class="hide" role="tab" onclick="setTodayTab('reviews')">⭐ Reviews <span class="cnt" id="todayRevN"></span></button>
+      <button id="tdtab-shortlist" role="tab" onclick="setTodayTab('shortlist')">Shortlist <span class="cnt" id="todaySlN"></span></button>
+    </div>
+    <div id="todayShortlist" class="hide">
+      <div class="revnote" id="todaySlNote"></div>
+      <div class="board-search"><div class="search"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="todaySlSearch" placeholder="Search the shortlist…" oninput="renderShortlist()"></div></div>
+      <div id="todaySlBody"></div>
     </div>
     <div id="todayFollowup" class="hide"><div class="revnote" id="fuNote"></div><div class="group" id="todayFuList"></div></div>
     <div id="todayReviews" class="hide"><div class="revnote" id="revNote"></div><div class="group" id="todayRevList"></div></div>
@@ -906,6 +937,20 @@
       <div class="tnew"><div class="gh">New leads <span class="cnt" id="todayNewN"></span></div><div class="group" id="todayNew"></div></div>
       <div class="tjobs"><div class="gh">Today’s jobs <span class="cnt" id="todayJobsN"></span><button class="ghlink" onclick="showPage('jobcount')">Job Count ›</button></div><div class="group" id="todayJobs"></div></div>
     </div>
+  </div>
+</section>
+
+<!-- ================= SHORTLIST ================= -->
+<section id="page-shortlist" class="page">
+  <div class="wrap">
+    <div class="tdhead"><div class="tddate">Call-back shortlist</div><div class="tdsum" id="slSummary"></div></div>
+    <div class="board-search">
+      <div class="search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input id="slSearch" placeholder="Search the shortlist by name, phone, suburb, notes…" oninput="renderShortlist()">
+      </div>
+    </div>
+    <div id="slBody"></div>
   </div>
 </section>
 
@@ -1345,6 +1390,42 @@
   </div>
 </div>
 
+<!-- Shortlist pop-up: add a lead/client to the call-back shortlist, or change its day -->
+<div class="overlay" id="slOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="slTitle">Add to Shortlist</h3>
+      <button class="x" onclick="closeShortlistModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="sl-id">
+      <div class="slwho" id="slWho"></div>
+      <div class="field full">
+        <label>Call back on</label>
+        <div class="slquick" id="slQuick">
+          <button type="button" class="tbtn" data-d="0" onclick="slPick(0)">Today</button>
+          <button type="button" class="tbtn" data-d="1" onclick="slPick(1)">Tomorrow</button>
+          <button type="button" class="tbtn" data-d="3" onclick="slPick(3)">3 days</button>
+          <button type="button" class="tbtn" data-d="7" onclick="slPick(7)">1 week</button>
+          <button type="button" class="tbtn" data-d="" onclick="slPick(null)">No day</button>
+        </div>
+        <input id="sl-date" type="date" onchange="slQuickMark()">
+      </div>
+      <div class="field full">
+        <label>Notes</label>
+        <textarea id="sl-notes" placeholder="What they said, what to follow up on…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger" id="slRemoveBtn" onclick="removeFromShortlist()">Take off</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn sec" onclick="closeShortlistModal()">Cancel</button>
+        <button class="btn primary" id="slSaveBtn" onclick="saveShortlist()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ---------- Supabase ---------- */
 const SUPABASE_URL = 'https://haarvltpfcbixqbwkxpl.supabase.co';
@@ -1527,7 +1608,25 @@ async function init(){
   fillTodoDaySelect();
   renderBoard();
   renderTodoBadge();
-  if(loadOk)startRealtime();
+  if(loadOk){startRealtime();loadShortlistExtras().then(()=>{if(shortlistLeads().some(l=>l.archived))refreshActive();});}
+}
+/* Shortlisted clients that live in the Clients database (archived) aren't part of the live load, so they are
+   read by their flag: once at start-up and again whenever leads change on another device. */
+async function loadShortlistExtras(){
+  try{
+    let rows=rowsToLeads(await fetchPaged('leads',q=>q.filter('data->archived','eq','true').filter('data->shortlist','eq','true'))).filter(l=>l.archived&&l.shortlist);
+    const got=new Set(rows.map(l=>l.id));
+    // Archived leads this device still shows as shortlisted but the list no longer returns: re-read just those
+    // rows, so one taken off on another device drops off here too. Rows that don't come back are left alone.
+    const stale=leads.filter(l=>l.archived&&l.shortlist&&!got.has(l.id)).map(l=>l.id).slice(0,100);
+    if(stale.length){
+      const {data,error}=await _sb.from('leads').select('*').in('id',stale);
+      if(!error&&data)rows=rows.concat(rowsToLeads(data).filter(l=>l.archived));
+    }
+    if(!rows.length)return;
+    const fresh=new Map(rows.map(l=>[l.id,l]));
+    leads=leads.filter(l=>!fresh.has(l.id)).concat([...fresh.values()]);
+  }catch(e){console.warn('Shortlist load failed:',e);}
 }
 
 /* ---------- Real-time sync ---------- */
@@ -1538,7 +1637,10 @@ function startRealtime(){
     // An empty answer means the database refused (sign-in lapsed), not that every lead vanished: keep the board.
     if(!fresh.length&&activeLeads().length){checkSessionSoon();return;}
     // keep any archived history already loaded for the Clients tab
-    leads=archivedLoaded?fresh.concat(leads.filter(l=>l.archived)):fresh;
+    // keep archived leads already loaded (the full history for the Clients tab, or just the shortlisted ones)
+    const have=new Set(fresh.map(l=>l.id));
+    leads=fresh.concat(leads.filter(l=>l.archived&&!have.has(l.id)));
+    await loadShortlistExtras();
     if(!loading)refreshActive();
     renderTodoBadge();
   });});
@@ -1649,6 +1751,9 @@ function isDesk(){return DESK_MQ.matches;}
 function onLayoutChange(){if(!loading&&unlocked)refreshActive();}
 if(DESK_MQ.addEventListener)DESK_MQ.addEventListener('change',onLayoutChange);else if(DESK_MQ.addListener)DESK_MQ.addListener(onLayoutChange);
 const IC={
+  star:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.8z"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   call:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>',
   sms:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/></svg>',
   next:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
@@ -1669,10 +1774,11 @@ function renderNavBadges(){
   const al=activeLeads(),t=todayStr();
   setBadge('navN-pipeline',al.filter(l=>l.stage==='new').length);
   setBadge('navN-today',al.filter(l=>l.followUp&&l.followUp<=t&&!TERMINAL_STAGES.includes(l.stage)).length);
+  setBadge('navN-shortlist',slDueCount());
 }
 
 /* ---------- Navigation ---------- */
-const PAGE_TITLES={pipeline:['Pipeline','Leads'],today:['Today'],clients:['Clients'],jobcount:['Job Count'],calendar:['Calendar'],staff:['Staff Calendar'],map:['Map'],projects:['Projects'],todo:['To-Do']};
+const PAGE_TITLES={pipeline:['Pipeline','Leads'],today:['Today'],shortlist:['Shortlist'],clients:['Clients'],jobcount:['Job Count'],calendar:['Calendar'],staff:['Staff Calendar'],map:['Map'],projects:['Projects'],todo:['To-Do']};
 const MAIN_TABS=['pipeline','today','clients','jobcount'];
 function showPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
@@ -1686,7 +1792,7 @@ function showPage(p){
   document.getElementById('pageTitle').innerHTML=t[1]?`<span class="d-only">${t[0]}</span><span class="m-only">${t[1]}</span>`:t[0];
   closeMoreSheet();closeDateRange();
   if(window.scrollY)window.scrollTo(0,0);
-  if(p==='clients'){renderTable();ensureArchivedLoaded();renderSelectAllMatching();}else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else if(p==='jobcount')renderJobCount();else if(p==='today')renderToday();else renderBoard();
+  if(p==='clients'){renderTable();ensureArchivedLoaded();renderSelectAllMatching();}else if(p==='map')renderMap();else if(p==='calendar')renderCal();else if(p==='staff')renderStaff();else if(p==='projects')renderProjects();else if(p==='todo')renderTodos();else if(p==='jobcount')renderJobCount();else if(p==='today')renderToday();else if(p==='shortlist')renderShortlist();else renderBoard();
   renderSelBar();
 }
 /* Phone "More" sheet: the pages that don't fit in the tab bar, plus Lead Feed and Account. */
@@ -1700,6 +1806,7 @@ function refreshActive(){
   renderNavBadges();
   if(document.getElementById('page-clients').classList.contains('active'))renderTable();
   else if(document.getElementById('page-today').classList.contains('active'))renderToday();
+  else if(document.getElementById('page-shortlist').classList.contains('active'))renderShortlist();
   else if(document.getElementById('page-map').classList.contains('active'))renderMap();
   else if(document.getElementById('page-calendar').classList.contains('active'))renderCal();
   else if(document.getElementById('page-staff').classList.contains('active'))renderStaff();
@@ -1921,11 +2028,13 @@ function cardEl(l){
       ${srcChip(l)}
       ${fuChip(l)}
       ${jobChip(l)}
+      ${slChip(l)}
     </div>
     <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
     <div class="cmeta" onclick="event.stopPropagation()">${stageSelHtml(l)}<span class="age">Added ${ago(l.createdAt)}</span></div>
     <div class="dfoot trackrow" onclick="event.stopPropagation()">
       ${tkHtml(l,'d1')}${tkHtml(l,'d2')}${tkHtml(l,'d3')}${tkHtml(l,'called')}<span class="sp"></span>
+      ${slStar(l)}
       ${l.phone?`<a class="ib call" href="tel:${tel}" title="Call ${esc(l.phone)}" aria-label="Call">${IC.call}</a><button class="ib" onclick="quickSms('${l.id}')" title="Text ${esc(l.phone)} — opens your phone's SMS app with a reply pre-written" aria-label="Text">${IC.sms}</button>`:''}
       ${nextStage?`<button class="ib go" onclick="advanceStage('${l.id}')" title="Move to ${esc(nextStage.name)}" aria-label="Move to ${esc(nextStage.name)}">${IC.next}</button>`:''}
     </div>
@@ -1947,8 +2056,9 @@ function pcardEl(l,showStage){
       <label class="av avchk" title="Mark done" onclick="event.stopPropagation()"><input type="checkbox" class="donechk" aria-label="Mark done"><span>${esc(avInitials(l.name))}</span></label>
       <div class="who"><div class="nm">${esc(l.name)}</div><div class="sub">${sub}</div></div>
       ${l.value?`<div class="val">${money(l.value)}</div>`:''}
+      ${slStar(l)}
     </div>
-    <div class="chips">${showStage?`<span class="chip stg" style="--sc:${st.color}"><i></i>${esc(st.name)}</span>`:''}${srcChip(l)}${fuChip(l)}${jobChip(l)}</div>
+    <div class="chips">${showStage?`<span class="chip stg" style="--sc:${st.color}"><i></i>${esc(st.name)}</span>`:''}${srcChip(l)}${fuChip(l)}${jobChip(l)}${slChip(l)}</div>
     ${(l.phone||l.address||l.suburb)?`<div class="pinfo">${l.phone?`<span>${IC.call}${telLink(l.phone,true)}</span>`:''}${(l.address||l.suburb)?`<span>${IC.map}${placeLink(l,true)}</span>`:''}</div>`:''}
     <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
     <div class="actions${l.phone?'':' nophone'}" onclick="event.stopPropagation()">
@@ -2156,7 +2266,7 @@ function renderTable(){
       return `<tr onclick="rowOpen(event,'${l.id}')">
         <td style="width:28px"><input type="checkbox" class="rowCheck" value="${esc(l.id)}" ${ticked(l)?'checked':''} onchange="setClientSelected(this.value,this.checked)" onclick="event.stopPropagation()" aria-label="Tick ${esc(l.name)}"></td>
         <td style="width:28px;color:var(--faint);font-size:12px;font-weight:700">${start+i+1}</td>
-        <td class="name-cell"><div class="who2"><div class="av">${esc(avInitials(l.name))}</div><div>${esc(l.name)}<small>${telLink(l.phone)}${l.phone&&l.email?' · ':''}${esc(l.email||'')}</small></div></div></td>
+        <td class="name-cell"><div class="who2"><div class="av">${esc(avInitials(l.name))}</div><div>${esc(l.name)}<small>${telLink(l.phone)}${l.phone&&l.email?' · ':''}${esc(l.email||'')}</small></div>${slStar(l)}</div></td>
         <td>${esc(l.service)}</td>
         <td>${esc(l.suburb||'—')}${l.address?`<br><a class="tel" style="font-size:12px;color:var(--muted)" href="${mapsLink(l)}" target="_blank" rel="noopener">${esc(l.address)}</a>`:''}</td>
         <td style="font-weight:800">${money(l.value)||'—'}</td>
@@ -2175,6 +2285,7 @@ function renderTable(){
       return `<div class="crow" onclick="rowOpen(event,'${l.id}')">
         <label class="cbx" onclick="event.stopPropagation()"><input type="checkbox" class="rowCheck" value="${esc(l.id)}" ${ticked(l)?'checked':''} onchange="setClientSelected(this.value,this.checked)" onclick="event.stopPropagation()" aria-label="Tick ${esc(l.name)}"></label>
         <div class="who"><div class="t">${esc(l.name)}</div><div class="s" style="--sc:${st.color}"><i></i>${esc(st.name)} · ${esc(l.suburb||'—')} · ${new Date(l.createdAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'2-digit'})}</div>${fu}</div>
+        ${slStar(l)}
         <div class="r">${money(l.value)||'—'}<small>${esc(l.service)}</small></div>
       </div>`;
     }).join('');
@@ -2371,9 +2482,10 @@ function openModal(id){
 /* Call / Map shortcuts at the top of the lead editor (links only; nothing is saved). */
 function renderLeadQuick(l){
   const el=document.getElementById('leadQuick');
-  if(!l||!(l.phone||l.address||l.suburb)){el.classList.add('hide');el.innerHTML='';return;}
+  if(!l){el.classList.add('hide');el.innerHTML='';return;}
   el.innerHTML=(l.phone?`<a class="act" href="tel:${dialNum(l.phone)}">${IC.call}Call</a>`:'')
-    +((l.address||l.suburb)?`<a class="act" href="${mapsLink(l)}" target="_blank" rel="noopener">${IC.map}Map</a>`:'');
+    +((l.address||l.suburb)?`<a class="act" href="${mapsLink(l)}" target="_blank" rel="noopener">${IC.map}Map</a>`:'')
+    +`<button type="button" class="act sl${l.shortlist?' on':''}" onclick="openShortlistModal('${l.id}')">${IC.star}${l.shortlist?(l.callbackDate?esc(fmtD(l.callbackDate)):'Shortlisted'):'Shortlist'}</button>`;
   el.classList.remove('hide');
 }
 function renderHist(l){
@@ -3015,6 +3127,119 @@ async function renderJobCount(){
   updEl.textContent=latest?('Updated '+ago(latest)+' · syncs every hour'):'';
 }
 
+/* ---------- Shortlist ----------
+   A hand-picked call-back list (built for Pippi): any lead or client, archived ones included, can be starred
+   from the Pipeline, the Clients table or the lead editor. Fields on the lead: shortlist (true), shortlistAt (ms),
+   callbackDate ('YYYY-MM-DD', optional). Separate from followUp, so it never changes Today's follow-ups due.
+   Shown on its own page (desktop sidebar) and as the Shortlist tab on Today (how phones reach it). */
+function shortlistLeads(){return leads.filter(l=>l.shortlist);}
+function slDueCount(){const t=todayStr();return shortlistLeads().filter(l=>l.callbackDate&&l.callbackDate<=t).length;}
+function fmtDow(s){const p=s.split('-');return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(+p[0],p[1]-1,+p[2]).getDay()]+' '+fmtD(s);}
+function slStar(l){
+  const tip=l.shortlist?'On the shortlist'+(l.callbackDate?', call back '+fmtD(l.callbackDate):'')+' (tap to change)':'Add to the call-back shortlist';
+  return `<button type="button" class="ib sl${l.shortlist?' on':''}" onclick="event.stopPropagation();openShortlistModal('${l.id}')" title="${tip}" aria-label="${tip}">${IC.star}</button>`;
+}
+function slChip(l){return l.shortlist?`<span class="chip slc">★ ${l.callbackDate?'Call back '+fmtD(l.callbackDate):'Shortlist'}</span>`:'';}
+function slCard(l){
+  const st=stageMap[l.stage],t=todayStr(),tel=dialNum(l.phone),cb=l.callbackDate||'';
+  const cls=!cb?'none':cb<t?'over':cb===t?'today':'';
+  const when=!cb?'No day set':cb<t?'Overdue · '+fmtD(cb):cb===t?'Call today':fmtDow(cb);
+  const sub=[esc(l.service||''),esc(l.suburb||'')].filter(Boolean).join(' · ');
+  return `<div class="pcard slcard" style="--sc:${st?st.color:'var(--line)'}" onclick="openModal('${l.id}')">
+    <div class="ptop">
+      <div class="av">${esc(avInitials(l.name))}</div>
+      <div class="who"><div class="nm">${esc(l.name)}</div><div class="sub">${sub}</div></div>
+      <div class="slwhen ${cls}">${esc(when)}</div>
+    </div>
+    <div class="chips">${l.archived?'<span class="chip">Past client</span>':st?`<span class="chip stg" style="--sc:${st.color}"><i></i>${esc(st.name)}</span>`:''}${srcChip(l)}${jobChip(l)}</div>
+    ${(l.phone||l.address||l.suburb)?`<div class="pinfo">${l.phone?`<span>${IC.call}${telLink(l.phone,true)}</span>`:''}${(l.address||l.suburb)?`<span>${IC.map}${placeLink(l,true)}</span>`:''}</div>`:''}
+    <textarea class="cardnotes" rows="${notesRows(l.notes)}" placeholder="Add notes…" onclick="event.stopPropagation()" onblur="cardNotesSave('${l.id}',this.value)">${esc(l.notes||'')}</textarea>
+    <div class="actions" onclick="event.stopPropagation()">
+      ${tel?`<a class="act" href="tel:${tel}">${IC.call}Call</a><a class="act" href="sms:${tel}">${IC.sms}Text</a>`:''}
+      <button type="button" class="act" onclick="openShortlistModal('${l.id}')">${IC.cal}Change day</button>
+      <button type="button" class="act done" onclick="removeFromShortlist('${l.id}')">${IC.check}Done</button>
+    </div>
+    ${l.shortlistAt?`<div class="upd">On the shortlist since ${fmtDT(l.shortlistAt)}</div>`:''}
+  </div>`;
+}
+function slHtml(all,q){
+  const t=todayStr(),words=searchWords(q||'');
+  const list=words.length?all.filter(l=>{const hay=searchNorm(`${l.name||''} ${l.phone||''} ${phoneKeys(l.phone)} ${l.suburb||''} ${l.address||''} ${l.service||''} ${l.notes||''}`);return words.every(w=>hay.includes(w));}):all;
+  if(!all.length)return '<div class="pempty">Nobody on the shortlist yet. Tap the ☆ star on any lead or client to add them with a call-back day.</div>';
+  if(!list.length)return '<div class="pempty">Nobody on the shortlist matches your search.</div>';
+  const byDate=(a,b)=>a.callbackDate<b.callbackDate?-1:a.callbackDate>b.callbackDate?1:(a.shortlistAt||0)-(b.shortlistAt||0);
+  const groups=[
+    ['Call today',list.filter(l=>l.callbackDate&&l.callbackDate<=t).sort(byDate)],
+    ['Coming up',list.filter(l=>l.callbackDate&&l.callbackDate>t).sort(byDate)],
+    ['No day set',list.filter(l=>!l.callbackDate).sort((a,b)=>(b.shortlistAt||0)-(a.shortlistAt||0))],
+  ];
+  return groups.filter(g=>g[1].length).map(g=>`<div class="gh">${g[0]} <span class="cnt">${g[1].length}</span></div><div class="sllist">${g[1].map(slCard).join('')}</div>`).join('');
+}
+function renderShortlist(){
+  const all=shortlistLeads(),t=todayStr(),due=slDueCount(),over=all.filter(l=>l.callbackDate&&l.callbackDate<t).length;
+  const sum=`<b>${all.length}</b> on the shortlist · <b>${due}</b> to call today${over?` (${over} overdue)`:''}`;
+  [['slBody','slSearch','slSummary'],['todaySlBody','todaySlSearch','todaySlNote']].forEach(([b,s,n])=>{
+    const body=document.getElementById(b);
+    if(!body)return;
+    document.getElementById(n).innerHTML=sum;
+    // Don't redraw under someone typing a note (a background refresh would wipe it).
+    if(document.activeElement&&document.activeElement.tagName==='TEXTAREA'&&body.contains(document.activeElement))return;
+    body.innerHTML=slHtml(all,document.getElementById(s).value);
+  });
+  document.getElementById('todaySlN').textContent=due||'';
+}
+function slEditorOpenFor(id){return document.getElementById('overlay').classList.contains('open')&&document.getElementById('f-id').value===id;}
+function slDayStr(n){const d=new Date();d.setDate(d.getDate()+n);return dToStr(d.getTime());}
+function slQuickMark(){
+  const v=document.getElementById('sl-date').value;
+  document.querySelectorAll('#slQuick .tbtn').forEach(b=>b.classList.toggle('on',b.dataset.d===''?!v:v===slDayStr(+b.dataset.d)));
+}
+function slPick(n){document.getElementById('sl-date').value=n===null?'':slDayStr(n);slQuickMark();}
+function openShortlistModal(id){
+  const l=leads.find(x=>x.id===id);
+  if(!l)return;
+  document.getElementById('sl-id').value=id;
+  document.getElementById('slTitle').textContent=l.shortlist?'Shortlist':'Add to Shortlist';
+  document.getElementById('slWho').innerHTML=esc(l.name)+`<small>${[esc(l.phone||''),esc(l.suburb||'')].filter(Boolean).join(' · ')}</small>`;
+  document.getElementById('sl-date').value=l.callbackDate||'';
+  // If the lead editor is open underneath, start from what's typed there.
+  document.getElementById('sl-notes').value=slEditorOpenFor(id)?document.getElementById('f-notes').value:(l.notes||'');
+  document.getElementById('slRemoveBtn').style.display=l.shortlist?'':'none';
+  document.getElementById('slSaveBtn').textContent=l.shortlist?'Save':'Add to Shortlist';
+  slQuickMark();
+  const o=document.getElementById('slOverlay');o.classList.add('open');o.querySelector('.modal').scrollTop=0;
+}
+function closeShortlistModal(){document.getElementById('slOverlay').classList.remove('open');}
+function slAfterChange(l){
+  // The lead editor may be open underneath: keep its notes, shortcut buttons and history in step.
+  if(slEditorOpenFor(l.id)){document.getElementById('f-notes').value=l.notes||'';renderLeadQuick(l);renderHist(l);}
+  refreshActive();
+}
+function saveShortlist(){
+  const l=leads.find(x=>x.id===document.getElementById('sl-id').value);
+  if(!l){closeShortlistModal();return;}
+  const date=document.getElementById('sl-date').value,was=!!l.shortlist;
+  if(!was){l.shortlist=true;l.shortlistAt=Date.now();logAct(l,'Added to Shortlist'+(date?', call back '+fmtD(date):''));}
+  else if(date!==(l.callbackDate||''))logAct(l,date?'Call back moved to '+fmtD(date)+' (Shortlist)':'Call-back day cleared (Shortlist)');
+  if(date)l.callbackDate=date;else delete l.callbackDate;
+  l.notes=document.getElementById('sl-notes').value.trim();
+  closeShortlistModal();
+  slAfterChange(l);
+  showToast(was?'Shortlist updated':'Added to Shortlist');
+  syncLead(l).catch(()=>{});
+}
+function removeFromShortlist(id){
+  const l=leads.find(x=>x.id===(id||document.getElementById('sl-id').value));
+  if(!l)return;
+  delete l.shortlist;delete l.callbackDate;delete l.shortlistAt;
+  logAct(l,'Taken off Shortlist');
+  closeShortlistModal();
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  slAfterChange(l);
+  showToast('Taken off the Shortlist');
+  syncLead(l).catch(()=>{});
+}
+
 /* ---------- Today ----------
    Follow-ups due (same rule as the Pipeline stat), new leads, and today's ServiceM8 bookings from the
    Job Count data (the same bounded job_count_daily query the Job Count tab uses; reused if already loaded). */
@@ -3047,6 +3272,7 @@ function renderToday(){
   renderTodayJobs();
   renderTodayReviews();
   renderTodayFollowup();
+  renderShortlist();
   if(!jcLoadedAt||jcStale||Date.now()-jcLoadedAt>5*60000)loadTodayJobs();
 }
 async function loadTodayJobs(){
@@ -3057,6 +3283,8 @@ async function loadTodayJobs(){
   finally{todayJcLoading=false;}
   if(document.getElementById('page-today').classList.contains('active')){renderTodayJobs();renderTodayReviews();}
 }
+/* The Follow Up and Reviews tab buttons are hidden (Aaron, 15 Nov 2026: Today shows Overview + Shortlist only).
+   Their code is kept, so removing class="hide" from the two buttons brings them back. */
 /* ---------- Today › Reviews ----------
    Today's Job Count jobs with a one-tap review text. Phone + leadId come from the Job Count Tracker
    (n8n) on each jobs[] entry. Sending opens the phone's Messages pre-filled (nothing is sent by the CRM)
@@ -3065,7 +3293,9 @@ async function loadTodayJobs(){
 let todayTab='overview',todayRevJobs=[];
 function setTodayTab(t){
   todayTab=t;
-  ['overview','followup','reviews'].forEach(k=>document.getElementById('tdtab-'+k).classList.toggle('on',k===t));
+  ['overview','followup','reviews','shortlist'].forEach(k=>document.getElementById('tdtab-'+k).classList.toggle('on',k===t));
+  document.getElementById('todayShortlist').classList.toggle('hide',t!=='shortlist');
+  if(t==='shortlist')renderShortlist();
   document.getElementById('todayOverview').classList.toggle('hide',t!=='overview');
   document.getElementById('todayFollowup').classList.toggle('hide',t!=='followup');
   if(t==='followup')renderTodayFollowup();
@@ -4066,6 +4296,7 @@ _sb.auth.onAuthStateChange(event=>{
 bootAuth();
 document.getElementById('accountOverlay').addEventListener('click',e=>{if(e.target.id==='accountOverlay')closeAccountModal();});
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+document.getElementById('slOverlay').addEventListener('click',e=>{if(e.target.id==='slOverlay')closeShortlistModal();});
 document.getElementById('overlay2').addEventListener('click',e=>{if(e.target.id==='overlay2')closeProject();});
 document.getElementById('moreOverlay').addEventListener('click',e=>{if(e.target.id==='moreOverlay')closeMoreSheet();});
 window.addEventListener('scroll',()=>{if(isDesk())closeDateRange();},{passive:true});
@@ -4076,6 +4307,7 @@ document.addEventListener('keydown',e=>{
   const s=document.getElementById('addrSug');
   if(s&&!s.classList.contains('hide')){hideSug();return;}
   if(!document.getElementById('dateRangePop').classList.contains('hide')){closeDateRange();return;}
+  if(document.getElementById('slOverlay').classList.contains('open')){closeShortlistModal();return;}
   if(document.getElementById('moreOverlay').classList.contains('open')){closeMoreSheet();return;}
   if(document.getElementById('accountOverlay').classList.contains('open')){closeAccountModal();return;}
   if(document.getElementById('overlay2').classList.contains('open')){closeProject();return;}
