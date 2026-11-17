@@ -304,6 +304,9 @@
   .pcard .ptop .ib.sl,.crow .ib.sl{width:44px;height:44px;border-radius:50%}
   .pcard .ptop .ib.sl svg,.crow .ib.sl svg{width:20px;height:20px}
   .who2 .ib.sl{margin-left:auto}
+  .crow .cacts{display:flex;gap:6px;flex-shrink:0}
+  .crow .cacts .ib{width:40px;height:40px;border-radius:50%}
+  .crow .cacts .ib svg{width:19px;height:19px}
   .chip.slc{background:var(--accent-soft);color:var(--accent-dark)}
   .sllist{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
   .slcard .actions{grid-template-columns:1fr 1fr}
@@ -386,13 +389,13 @@
   .crow .cbx{width:44px;height:44px;flex-shrink:0}
   .crow .rowCheck{width:22px;height:22px}
   .crow .who{min-width:0;flex:1}
-  .crow .t{font-weight:800;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .crow .s{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .crow .t{font-weight:800;font-size:15.5px;line-height:1.2;overflow-wrap:anywhere}
+  .crow .s{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
   .crow .s i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sc);margin-right:5px;vertical-align:1px}
   .crow .fu{margin-top:6px}
   .crow .fu .stagesel{font-size:16px;min-height:36px;max-width:190px!important;padding:3px 28px 3px 12px}
   .crow .r{margin-left:auto;text-align:right;font-weight:900;font-variant-numeric:tabular-nums;flex-shrink:0;font-size:15px}
-  .crow .r small{display:block;color:var(--faint);font-weight:700;font-size:12px;max-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow .r small{display:block;color:var(--faint);font-weight:700;font-size:12px;max-width:80px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px}
   .pager .pinfo{color:var(--muted);font-size:13px;font-weight:700;margin-right:auto}
   .pager button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:800;color:var(--ink);min-width:40px;min-height:40px}
@@ -2266,7 +2269,7 @@ function renderTable(){
       return `<tr onclick="rowOpen(event,'${l.id}')">
         <td style="width:28px"><input type="checkbox" class="rowCheck" value="${esc(l.id)}" ${ticked(l)?'checked':''} onchange="setClientSelected(this.value,this.checked)" onclick="event.stopPropagation()" aria-label="Tick ${esc(l.name)}"></td>
         <td style="width:28px;color:var(--faint);font-size:12px;font-weight:700">${start+i+1}</td>
-        <td class="name-cell"><div class="who2"><div class="av">${esc(avInitials(l.name))}</div><div>${esc(l.name)}<small>${telLink(l.phone)}${l.phone&&l.email?' · ':''}${esc(l.email||'')}</small></div>${slStar(l)}</div></td>
+        <td class="name-cell"><div class="who2"><div class="av">${esc(avInitials(l.name))}</div><div>${esc(l.name)}<small>${telLink(l.phone)}${l.phone&&l.email?' · ':''}${esc(l.email||'')}</small></div>${slStar(l)}${clientSmsBtn(l)}</div></td>
         <td>${esc(l.service)}</td>
         <td>${esc(l.suburb||'—')}${l.address?`<br><a class="tel" style="font-size:12px;color:var(--muted)" href="${mapsLink(l)}" target="_blank" rel="noopener">${esc(l.address)}</a>`:''}</td>
         <td style="font-weight:800">${money(l.value)||'—'}</td>
@@ -2285,7 +2288,7 @@ function renderTable(){
       return `<div class="crow" onclick="rowOpen(event,'${l.id}')">
         <label class="cbx" onclick="event.stopPropagation()"><input type="checkbox" class="rowCheck" value="${esc(l.id)}" ${ticked(l)?'checked':''} onchange="setClientSelected(this.value,this.checked)" onclick="event.stopPropagation()" aria-label="Tick ${esc(l.name)}"></label>
         <div class="who"><div class="t">${esc(l.name)}</div><div class="s" style="--sc:${st.color}"><i></i>${esc(st.name)} · ${esc(l.suburb||'—')} · ${new Date(l.createdAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'2-digit'})}</div>${fu}</div>
-        ${slStar(l)}
+        <div class="cacts">${clientSmsBtn(l)}${slStar(l)}</div>
         <div class="r">${money(l.value)||'—'}<small>${esc(l.service)}</small></div>
       </div>`;
     }).join('');
@@ -3944,6 +3947,19 @@ function quickSms(id){
   const text=tplTextForLead(l,i);
   location.href='sms:'+dialNum(l.phone)+'?&body='+encodeURIComponent(text);
   logAct(l,'Texted "'+(tpls[i]?tpls[i].name:'message')+'" template (quick)');
+  syncLead(l);
+}
+/* Clients tab text button: opens the phone's SMS app with the yearly "clean again?" message pre-written. */
+const CLIENT_SMS_TPL='Good afternoon {name},\n\nWe came out and cleaned your oven or bbq 12 months ago, just seeing if you would like to get it done again before this Christmas or early January?\n\nThankyou\nBella\nRapid Oven Cleaning';
+function clientSmsBtn(l){
+  if(!l.phone||!dialNum(l.phone))return'';
+  return `<button type="button" class="ib" onclick="event.stopPropagation();clientSms('${l.id}')" title="Text ${esc(l.phone)} (opens your phone's SMS app with the message pre-written)" aria-label="Text ${esc(l.name)}">${IC.sms}</button>`;
+}
+function clientSms(id){
+  const l=leads.find(x=>x.id===id);
+  if(!l||!l.phone)return;
+  location.href='sms:'+dialNum(l.phone)+'?&body='+encodeURIComponent(personaliseSmsText(l,CLIENT_SMS_TPL));
+  logAct(l,'Texted "Clean again (12 months)" message (Clients)');
   syncLead(l);
 }
 function tplEmail(){
