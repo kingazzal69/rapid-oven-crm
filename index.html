@@ -390,7 +390,7 @@
   .crow .rowCheck{width:22px;height:22px}
   .crow .who{min-width:0;flex:1}
   .crow .t{font-weight:800;font-size:15.5px;line-height:1.2;overflow-wrap:anywhere}
-  .crow .s{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+  .crow .s{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
   .crow .s i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sc);margin-right:5px;vertical-align:1px}
   .crow .fu{margin-top:6px}
   .crow .fu .stagesel{font-size:16px;min-height:36px;max-width:190px!important;padding:3px 28px 3px 12px}
@@ -2287,9 +2287,9 @@ function renderTable(){
       const fu=TERMINAL_STAGES.includes(l.stage)?'':`<div class="fu" onclick="event.stopPropagation()">${fuCellSelect(l)}</div>`;
       return `<div class="crow" onclick="rowOpen(event,'${l.id}')">
         <label class="cbx" onclick="event.stopPropagation()"><input type="checkbox" class="rowCheck" value="${esc(l.id)}" ${ticked(l)?'checked':''} onchange="setClientSelected(this.value,this.checked)" onclick="event.stopPropagation()" aria-label="Tick ${esc(l.name)}"></label>
-        <div class="who"><div class="t">${esc(l.name)}</div><div class="s" style="--sc:${st.color}"><i></i>${esc(st.name)} · ${esc(l.suburb||'—')} · ${new Date(l.createdAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'2-digit'})}</div>${fu}</div>
+        <div class="who"><div class="t">${esc(l.name)}</div><div class="s" style="--sc:${st.color}"><i></i>${esc(st.name)} · ${esc(l.suburb||'—')} · ${new Date(l.createdAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'2-digit'})}${l.service?' · '+esc(l.service):''}</div>${fu}</div>
         <div class="cacts">${clientSmsBtn(l)}${slStar(l)}</div>
-        <div class="r">${money(l.value)||'—'}<small>${esc(l.service)}</small></div>
+        ${money(l.value)?`<div class="r">${money(l.value)}</div>`:''}
       </div>`;
     }).join('');
   }
@@ -3952,8 +3952,9 @@ function quickSms(id){
 /* Clients tab text button: opens the phone's SMS app with the yearly "clean again?" message pre-written. */
 const CLIENT_SMS_TPL='Good afternoon {name},\n\nWe came out and cleaned your oven or bbq 12 months ago, just seeing if you would like to get it done again before this Christmas or early January?\n\nThankyou\nBella\nRapid Oven Cleaning';
 function clientSmsBtn(l){
-  if(!l.phone||!dialNum(l.phone))return'';
-  return `<button type="button" class="ib" onclick="event.stopPropagation();clientSms('${l.id}')" title="Text ${esc(l.phone)} (opens your phone's SMS app with the message pre-written)" aria-label="Text ${esc(l.name)}">${IC.sms}</button>`;
+  const tel=l.phone?dialNum(l.phone):'';
+  if(!tel)return'';
+  return `<a class="ib call" href="tel:${tel}" onclick="event.stopPropagation()" title="Call ${esc(l.phone)}" aria-label="Call ${esc(l.name)}">${IC.call}</a><button type="button" class="ib" onclick="event.stopPropagation();clientSms('${l.id}')" title="Text ${esc(l.phone)} (opens your phone's SMS app with the message pre-written)" aria-label="Text ${esc(l.name)}">${IC.sms}</button>`;
 }
 function clientSms(id){
   const l=leads.find(x=>x.id===id);
