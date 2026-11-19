@@ -569,11 +569,12 @@
   .jcrbtn{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:800;text-transform:none;letter-spacing:0;min-height:36px;cursor:pointer}
   .jcrbtn.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-dark)}
   .jcroster{background:var(--panel);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 12px 12px;margin-bottom:12px;max-width:520px}
-  .jcrgrid{display:grid;grid-template-columns:minmax(64px,1fr) repeat(7,minmax(34px,44px));align-items:center}
+  .jcrgrid{display:grid;grid-template-columns:minmax(48px,1fr) repeat(7,minmax(26px,44px)) 54px;align-items:center}
   .jcrgrid b{font-size:12px;font-weight:800;color:var(--muted);text-align:center;padding-bottom:2px}
   .jcrgrid .n{font-weight:800;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .jcrgrid label{display:flex;align-items:center;justify-content:center;height:44px;cursor:pointer}
   .jcrgrid input{width:22px;height:22px;margin:0;cursor:pointer}
+  .jcrgrid .mx{width:46px;height:36px;box-sizing:border-box;justify-self:end;text-align:center;font:inherit;font-weight:800;font-size:15px;border:1.5px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);padding:0}
   .jcrnote{font-size:12.5px;color:var(--muted);margin-top:6px}
   /* Month label between day chips (the strip runs about two months ahead) */
   .jcmon{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;justify-content:center;padding:0 4px;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-dark);writing-mode:vertical-rl;transform:rotate(180deg)}
@@ -1597,6 +1598,7 @@ async function init(){
     if(cfgData.tpls)tpls=withReviewTpls(cfgData.tpls);
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
     applyJcRoster(cfgData.jcRoster);
+    applyJcCap(cfgData.jcCap);
     if(cfgData.todoXp)todoXp=cfgData.todoXp;
     loadOk=true;
   }catch(e){
@@ -1668,6 +1670,7 @@ function startRealtime(){
     if(cfgData.tpls)tpls=withReviewTpls(cfgData.tpls);
     if(cfgData.jobTarget)jobTarget=cfgData.jobTarget;
     applyJcRoster(cfgData.jcRoster);
+    applyJcCap(cfgData.jcCap);
     if(cfgData.todoXp!==undefined)todoXp=cfgData.todoXp;
     if(!loading)fillStaffSelect();
     if(!loading)fillTplSelect();
@@ -1717,6 +1720,7 @@ async function saveConfig(){
   if(!loadOk){saveFailed();return;}
   const data={staff,tpls,jobTarget,todoXp};
   if(jcRosterSaved)data.jcRoster=jcRoster; // keep the saved roster when other settings are saved
+  if(jcCapSaved)data.jcCap=window.jcCapSnapshot(); // and the saved job limits
   try{
     const cfg=await fetchAll('config');
     const {error}=cfg.length
@@ -1735,6 +1739,19 @@ async function saveJcRoster(){
     const {error}=cfg.length
       ?await _sb.from('config').update({data:{...(cfg[0].data||{}),jcRoster},updated_at:now}).eq('id',cfg[0].id)
       :await _sb.from('config').insert({id:'default',data:{staff,tpls,jobTarget,todoXp,jcRoster},updated_at:now});
+    if(error)throw error;
+  }catch(e){saveFailed(e);}
+}
+/* Max jobs edit: saves only jcCap (keyed by lowercase first name, integer 0-8) into the settings row, like saveJcRoster(). */
+async function saveJcCap(){
+  if(!loadOk){saveFailed();return;}
+  const jcCap=window.jcCapSnapshot();
+  try{
+    const cfg=await fetchAll('config');
+    const now=new Date().toISOString();
+    const {error}=cfg.length
+      ?await _sb.from('config').update({data:{...(cfg[0].data||{}),jcCap:{...((cfg[0].data||{}).jcCap||{}),...jcCap}},updated_at:now}).eq('id',cfg[0].id)
+      :await _sb.from('config').insert({id:'default',data:{staff,tpls,jobTarget,todoXp,jcCap},updated_at:now});
     if(error)throw error;
   }catch(e){saveFailed(e);}
 }
@@ -2866,9 +2883,22 @@ function applyJcRoster(v){
   if(!Array.isArray(v)||v.length!==7||!v.every(Array.isArray))return;
   jcRoster=v.map(d=>JC_ALL.filter(k=>d.includes(k)));jcRosterSaved=true;
 }
+// Job limits: JC_STAFF_CAP above is the default; anything saved in config.data.jcCap overrides it per name.
+// A valid limit is a whole number 0-8. Anything else (empty, negative, over 8, decimal, text) is REJECTED, never clamped, so a typo can't silently change a limit.
+function jcCapClean(v){
+  if(typeof v==='string'){if(!/^\s*\d+\s*$/.test(v))return null;v=Number(v);}
+  return typeof v==='number'&&Number.isInteger(v)&&v>=0&&v<=8?v:null;
+}
+let jcCapSaved={};
+const jcCapFor=k=>k in jcCapSaved?jcCapSaved[k]:JC_STAFF_CAP[k];
+window.jcCapSnapshot=()=>Object.fromEntries(JC_ALL.map(k=>[k,jcCapFor(k)]));
+function applyJcCap(v){
+  const o={};if(v&&typeof v==='object'&&!Array.isArray(v))JC_ALL.forEach(k=>{const n=jcCapClean(v[k]);if(n!==null)o[k]=n;});
+  jcCapSaved=o; // missing or junk = back to JC_STAFF_CAP
+}
 const jcFirst=n=>n.trim().split(/\s+/)[0].toLowerCase();
 function jcOn(name,date){const k=jcFirst(name);return !(k in JC_STAFF_CAP)||jcRoster[new Date(date+'T00:00:00').getDay()].includes(k);}
-function jcCapOf(name,date){return name==='Unassigned'||!jcOn(name,date)?0:(JC_STAFF_CAP[jcFirst(name)]??JC_SLOTS.length);}
+function jcCapOf(name,date){return name==='Unassigned'||!jcOn(name,date)?0:(jcCapFor(jcFirst(name))??JC_SLOTS.length);}
 function jcRosterNames(){
   // Full ServiceM8 names come from any job in the loaded days; a staff member with none yet shows by first name.
   const full=new Map();
@@ -2889,7 +2919,7 @@ function jcFreeSlotIdx(jobs,name,date){
   return JC_SLOTS.map((_,i)=>i).filter(i=>!jcInSlot(jobs,name,i).length).slice(0,room);
 }
 // Day totals are overall: every job booked that day (unassigned included) against the combined capacity of the staff rostered on.
-function jcDayCap(date){return jcRoster[new Date(date+'T00:00:00').getDay()].reduce((a,k)=>a+JC_STAFF_CAP[k],0);}
+function jcDayCap(date){return jcRoster[new Date(date+'T00:00:00').getDay()].reduce((a,k)=>a+jcCapFor(k),0);}
 function jcDayFree(jobs,date){return Math.max(0,jcDayCap(date)-jobs.length);}
 function jcBookedLine(jobs,name,date){
   const n=jobs.filter(j=>jcWho(j)===name).length;
@@ -2958,15 +2988,24 @@ function renderJcRoster(){
   if(box.classList.contains('hide'))return;
   const order=[1,2,3,4,5,6,0],full=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']; // Mon first
   const names=jcRosterNames();
-  box.innerHTML=`<div class="jcrgrid"><div></div>${order.map(d=>`<b>${full[d].slice(0,3)}</b>`).join('')}`
+  box.innerHTML=`<div class="jcrgrid"><div></div>${order.map(d=>`<b>${full[d].slice(0,3)}</b>`).join('')}<b>Max jobs</b>`
     +JC_ALL.map((k,i)=>`<div class="n">${esc(names[i].split(/\s+/)[0])}</div>`
-      +order.map(d=>`<label><input type="checkbox"${jcRoster[d].includes(k)?' checked':''} onchange="jcSetRoster('${k}',${d},this.checked)" aria-label="${esc(names[i])} works ${full[d]}"></label>`).join('')).join('')
-    +`</div><div class="jcrnote">Tick the days each person works. Unticked days show them greyed out as Off.</div>`;
+      +order.map(d=>`<label><input type="checkbox"${jcRoster[d].includes(k)?' checked':''} onchange="jcSetRoster('${k}',${d},this.checked)" aria-label="${esc(names[i])} works ${full[d]}"></label>`).join('')
+      +`<input class="mx" type="number" inputmode="numeric" min="0" max="8" step="1" value="${jcCapFor(k)}" onchange="jcSetCap('${k}',this.value)" aria-label="${esc(names[i])} max jobs a day (0 to 8)">`).join('')
+    +`</div><div class="jcrnote">Tick the days each person works. Unticked days show them greyed out as Off. Max jobs is the most jobs a day (0-8).</div>`;
 }
 function jcSetRoster(k,d,on){
   jcRoster[d]=JC_ALL.filter(x=>x===k?on:jcRoster[d].includes(x));
   jcRosterSaved=true;
   saveJcRoster();
+  renderJobCount();
+}
+function jcSetCap(k,raw){
+  const n=jcCapClean(raw);
+  if(n===null){renderJcRoster();return;} // rejected: put the saved number back
+  if(n===jcCapFor(k)&&jcCapSaved[k]!==undefined)return;
+  jcCapSaved={...window.jcCapSnapshot(),[k]:n};
+  saveJcCap();
   renderJobCount();
 }
 function jcPickDay(date){jcSelDay=date;renderJcSchedule();}
