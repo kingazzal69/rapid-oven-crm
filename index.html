@@ -2864,16 +2864,18 @@ const jcWho=j=>(j.staff||'').trim()||'Unassigned';
 const jcHasStaff=jobs=>(jobs||[]).some(j=>'staff' in j);
 // Daily capacity (jobs a day) per staff member, keyed by first name, in display order. These staff always show, even with no bookings.
 // Free = capacity - jobs booked. Anyone else with a booking uses the 6 standard slots as their capacity.
-const JC_STAFF_CAP={aaron:6,jackson:3,paras:4,kapil:5,bhuwan:5};
+const JC_STAFF_CAP={aaron:6,jackson:3,paras:4,kapil:5,bhuwan:5,edward:5,samir:5};
 // Weekly roster by day (0=Sun … 6=Sat), first names. Staff not rostered show as Off: no capacity, no free slots.
 const JC_ALL=Object.keys(JC_STAFF_CAP);
+// Edward and Samir (added 20 Nov 2026) are in no default day: tick their days in the Roster box.
+const JC_CORE=['aaron','jackson','paras','kapil','bhuwan'];
 const JC_ROSTER_DEFAULT=[
   ['aaron','kapil','paras'],   // Sun
   ['aaron','jackson','bhuwan'],// Mon
-  JC_ALL,                      // Tue
+  JC_CORE,                     // Tue
   ['aaron','jackson','bhuwan'],// Wed
-  JC_ALL,                      // Thu
-  JC_ALL,                      // Fri
+  JC_CORE,                     // Thu
+  JC_CORE,                     // Fri
   ['aaron','kapil','paras'],   // Sat
 ];
 // The roster in use: the default above until someone ticks the Roster boxes (saved as config.data.jcRoster, same shape).
